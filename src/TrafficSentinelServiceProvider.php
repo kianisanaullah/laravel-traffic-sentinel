@@ -14,39 +14,46 @@ class TrafficSentinelServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(__DIR__ . '/../config/traffic-sentinel.php', 'traffic-sentinel');
 
-        $this->app->singleton(TrafficTracker::class, function () {
-            return new TrafficTracker();
-        });
-        $this->app->singleton(TrafficStats::class, function () {
-            return new TrafficStats();
-        });
-        $this->app->singleton(TrafficStatsRange::class, function () {
-            return new TrafficStatsRange();
-        });
-
+        $this->app->singleton(TrafficTracker::class, fn () => new TrafficTracker());
+        $this->app->singleton(TrafficStats::class, fn () => new TrafficStats());
+        $this->app->singleton(TrafficStatsRange::class, fn () => new TrafficStatsRange());
     }
 
     public function boot(): void
     {
+        // Config
         $this->publishes([
             __DIR__ . '/../config/traffic-sentinel.php' => config_path('traffic-sentinel.php'),
         ], 'traffic-sentinel-config');
 
+        // Migrations
         $this->publishes([
-            __DIR__ . '/Database/migrations' => database_path('migrations'),
+            __DIR__ . '/../database/migrations' => database_path('migrations'),
         ], 'traffic-sentinel-migrations');
+
+        // Assets
+        $this->publishes([
+            __DIR__ . '/../resources/assets' => public_path('vendor/traffic-sentinel'),
+        ], 'traffic-sentinel-assets');
+
+        // Views
+        $this->loadViewsFrom(__DIR__ . '/../resources/views', 'traffic-sentinel');
+
+        // Optional
+        $this->publishes([
+            __DIR__ . '/../resources/views' => resource_path('views/vendor/traffic-sentinel'),
+        ], 'traffic-sentinel-views');
+
+        // Routes
+        if (config('traffic-sentinel.dashboard.enabled', true)) {
+            $this->loadRoutesFrom(__DIR__ . '/../routes/web.php');
+        }
+
+        // Commands
         if ($this->app->runningInConsole()) {
             $this->commands([
                 TrafficPruneCommand::class,
             ]);
         }
-        $this->loadViewsFrom(__DIR__ . '/../resources/views', 'traffic-sentinel');
-
-        if (config('traffic-sentinel.dashboard.enabled', true)) {
-            $this->loadRoutesFrom(__DIR__ . '/routes/web.php');
-        }
-        $this->publishes([
-            __DIR__ . '/../resources/views' => resource_path('views/vendor/traffic-sentinel'),
-        ], 'traffic-sentinel-views');
     }
 }
