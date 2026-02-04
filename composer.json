@@ -1,5 +1,5 @@
 {
-  "name": "kianisanaullah/traffic-sentinel",
+  "name": "kianisanaullah/laravel-traffic-sentinel",
   "description": "Traffic Sentinel for Laravel: tracks visitors + bots, online presence, and traffic stats.",
   "type": "library",
   "license": "MIT",
