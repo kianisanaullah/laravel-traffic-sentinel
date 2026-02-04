@@ -46,7 +46,7 @@ class TrafficSentinelServiceProvider extends ServiceProvider
 
         // Routes
         if (config('traffic-sentinel.dashboard.enabled', true)) {
-            $this->loadRoutesFrom(__DIR__ . '/../routes/web.php');
+            $this->loadRoutesFrom(__DIR__ . '/routes/web.php');
         }
 
         // Commands
