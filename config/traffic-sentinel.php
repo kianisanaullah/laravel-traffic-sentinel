@@ -111,4 +111,15 @@ return [
     'middleware' => [
         'auto_register' => false,
     ],
+    'cookie' => [
+        'name' => 'ts_vid',
+        'minutes' => 60 * 24 * 365 * 2,
+        'domain' => env('TS_COOKIE_DOMAIN', null),
+        'secure' => env('TS_COOKIE_SECURE', null),
+        'same_site' => 'Lax',
+    ],
+
+    'tracking' => [
+        'include_host' => true,
+    ],
 ];

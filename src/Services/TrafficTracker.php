@@ -11,7 +11,7 @@ use Kianisanaullah\TrafficSentinel\Models\TrafficSession;
 
 class TrafficTracker
 {
-    public function track(Request $request, ?int $durationMs = null, ?int $statusCode = null): void
+    public function track(Request $request, int $durationMs, ?int $statusCode, ?string $visitorId = null): void
     {
         if (! $this->shouldTrackBasic($request)) return;
 
@@ -20,7 +20,10 @@ class TrafficTracker
         $sessionId = $this->getSessionId($request);
         $ua = (string) $request->userAgent();
         $ipStored = $this->ipToStore($request->ip());
-        $visitorKey = $this->makeVisitorKey($ipStored, $ua);
+
+        $visitorKey = $this->makeVisitorKey($ipStored, $ua, $visitorId);
+
+        $host = strtolower((string) $request->getHost());
 
         [$isBot, $botName] = $this->detectBot($request);
 
@@ -33,14 +36,29 @@ class TrafficTracker
 
         $ref = (string) $request->headers->get('referer');
         $fullUrl = (string) $request->fullUrl();
-        $path = '/'.ltrim((string) $request->path(), '/');
+        $path = '/' . ltrim((string) $request->path(), '/');
         $routeName = optional($request->route())->getName();
 
         $userId = auth()->check() ? (int) auth()->id() : null;
 
         DB::transaction(function () use (
-            $sessionId, $visitorKey, $ipStored, $ua, $deviceType, $ref, $fullUrl, $path, $routeName,
-            $now, $userId, $durationMs, $statusCode, $request, $isBot, $botName
+            $sessionId,
+            $visitorKey,
+            $ipStored,
+            $ua,
+            $deviceType,
+            $ref,
+            $fullUrl,
+            $path,
+            $routeName,
+            $now,
+            $userId,
+            $durationMs,
+            $statusCode,
+            $request,
+            $isBot,
+            $botName,
+            $host
         ) {
             /** @var TrafficSession|null $session */
             $session = TrafficSession::query()
@@ -49,39 +67,44 @@ class TrafficTracker
 
             if (! $session) {
                 $session = TrafficSession::create([
-                    'session_id' => $sessionId,
-                    'visitor_key' => $visitorKey,
-                    'ip' => $ipStored,
-                    'user_agent' => Str::limit($ua, 500, ''),
-                    'device_type' => $deviceType,
-                    'referrer' => Str::limit($ref ?: null, 500, ''),
-                    'landing_url' => Str::limit($fullUrl ?: null, 500, ''),
+                    'session_id'    => $sessionId,
+                    'visitor_key'   => $visitorKey,
+                    'host'          => $host,
+                    'ip'            => $ipStored,
+                    'user_agent'    => Str::limit($ua, 500, ''),
+                    'device_type'   => $deviceType,
+                    'referrer'      => Str::limit($ref ?: null, 500, ''),
+                    'landing_url'   => Str::limit($fullUrl ?: null, 500, ''),
                     'first_seen_at' => $now,
-                    'last_seen_at' => $now,
-                    'user_id' => $userId,
-                    'is_bot' => $isBot,
-                    'bot_name' => $botName,
+                    'last_seen_at'  => $now,
+                    'user_id'       => $userId,
+                    'is_bot'        => $isBot,
+                    'bot_name'      => $botName,
                 ]);
             } else {
                 $session->update([
                     'last_seen_at' => $now,
-                    'user_id' => $userId ?? $session->user_id,
-                    'is_bot' => $session->is_bot || $isBot,
-                    'bot_name' => $session->bot_name ?: $botName,
+                    'user_id'      => $userId ?? $session->user_id,
+                    'is_bot'       => $session->is_bot || $isBot,
+                    'bot_name'     => $session->bot_name ?: $botName,
+
+
+                    'host'         => $session->host ?: $host,
                 ]);
             }
 
             TrafficPageview::create([
                 'traffic_session_id' => $session->id,
-                'method' => $request->method(),
-                'path' => Str::limit($path, 500, ''),
-                'full_url' => Str::limit($fullUrl, 800, ''),
-                'route_name' => $routeName,
-                'status_code' => $statusCode ? (string) $statusCode : null,
-                'duration_ms' => $durationMs,
-                'viewed_at' => $now,
-                'is_bot' => $isBot,
-                'bot_name' => $botName,
+                'host'               => $host,
+                'method'             => $request->method(),
+                'path'               => Str::limit($path, 500, ''),
+                'full_url'           => Str::limit($fullUrl, 800, ''),
+                'route_name'          => $routeName,
+                'status_code'         => $statusCode ? (string) $statusCode : null,
+                'duration_ms'         => $durationMs,
+                'viewed_at'           => $now,
+                'is_bot'              => $isBot,
+                'bot_name'            => $botName,
             ]);
         });
     }
@@ -181,10 +204,16 @@ class TrafficTracker
         return hash('sha256', $salt . '|' . $ip);
     }
 
-    protected function makeVisitorKey(?string $ipStored, string $ua): string
+    protected function makeVisitorKey(?string $ipStored, string $ua, ?string $visitorId = null): string
     {
+        $visitorId = trim((string) $visitorId);
+        if ($visitorId !== '') {
+            return 'vid_' . substr(hash('sha256', strtolower($visitorId)), 0, 32);
+        }
+
         $uaShort = substr(hash('sha1', strtolower($ua)), 0, 16);
-        $ipPart = $ipStored ? substr(hash('sha1', $ipStored), 0, 16) : 'noip';
+        $ipPart  = $ipStored ? substr(hash('sha1', $ipStored), 0, 16) : 'noip';
+
         return $ipPart . '-' . $uaShort;
     }
 }

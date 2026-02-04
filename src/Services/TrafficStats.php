@@ -13,13 +13,16 @@ class TrafficStats
     /**
      * Online sessions count.
      */
-    public function onlineCount(?int $minutes = null, bool $includeBots = false): int
+    public function onlineCount(?int $minutes = null, bool $includeBots = false, ?string $host = null): int
     {
         $minutes ??= (int) config('traffic-sentinel.online_minutes', 5);
+        $hostKey = $host ? strtolower($host) : 'all';
 
-        return $this->cached("onlineCount:$minutes:$includeBots", 10, function () use ($minutes, $includeBots) {
+        return $this->cached("onlineCount:$minutes:$includeBots:$hostKey", 10, function () use ($minutes, $includeBots, $host) {
             $q = TrafficSession::query()
                 ->where('last_seen_at', '>=', Carbon::now()->subMinutes($minutes));
+
+            if ($host) $q->where('host', $host);
 
             if (! $includeBots) $q->where('is_bot', false);
 
@@ -27,20 +30,31 @@ class TrafficStats
         });
     }
 
-    public function onlineHumansCount(?int $minutes = null): int
+    public function onlineHumansCount(?string $host = null, ?int $minutes = null): int
     {
-        return $this->onlineCount($minutes, false);
+        return $this->onlineCount($minutes, false, $host);
     }
 
-    public function onlineBotsCount(?int $minutes = null): int
+    public function onlineBotsCount(?string $host = null, ?int $minutes = null): int
     {
-        return $this->onlineCount($minutes, true) - $this->onlineCount($minutes, false);
+        $minutes ??= (int) config('traffic-sentinel.online_minutes', 5);
+        $hostKey = $host ? strtolower($host) : 'all';
+
+        return $this->cached("onlineBotsCount:$minutes:$hostKey", 10, function () use ($minutes, $host) {
+            $q = TrafficSession::query()
+                ->where('last_seen_at', '>=', Carbon::now()->subMinutes($minutes))
+                ->where('is_bot', true);
+
+            if ($host) $q->where('host', $host);
+
+            return (int) $q->count();
+        });
     }
 
     /**
      * Online sessions list (latest).
      */
-    public function onlineList(?int $minutes = null, bool $includeBots = false, int $limit = 50)
+    public function onlineList(?int $minutes = null, bool $includeBots = false, int $limit = 50, ?string $host = null)
     {
         $minutes ??= (int) config('traffic-sentinel.online_minutes', 5);
 
@@ -49,6 +63,7 @@ class TrafficStats
             ->orderByDesc('last_seen_at')
             ->limit($limit);
 
+        if ($host) $q->where('host', $host);
         if (! $includeBots) $q->where('is_bot', false);
 
         return $q->get();
@@ -57,44 +72,61 @@ class TrafficStats
     /**
      * Unique visitors today (by visitor_key).
      */
-    public function uniqueToday(bool $includeBots = false): int
+    public function uniqueToday(bool $includeBots = false, ?string $host = null): int
     {
-        return $this->cached("uniqueToday:$includeBots", 30, function () use ($includeBots) {
+        $hostKey = $host ? strtolower($host) : 'all';
+
+        return $this->cached("uniqueToday:$includeBots:$hostKey", 30, function () use ($includeBots, $host) {
             $start = Carbon::today();
-            $end = Carbon::tomorrow();
+            $end   = Carbon::tomorrow();
 
             $q = TrafficSession::query()
                 ->whereBetween('first_seen_at', [$start, $end]);
 
+            if ($host) $q->where('host', $host);
             if (! $includeBots) $q->where('is_bot', false);
 
             return (int) $q->distinct('visitor_key')->count('visitor_key');
         });
     }
 
-    public function uniqueHumansToday(): int
+    public function uniqueHumansToday(?string $host = null): int
     {
-        return $this->uniqueToday(false);
+        return $this->uniqueToday(false, $host);
     }
 
-    public function uniqueBotsToday(): int
+    public function uniqueBotsToday(?string $host = null): int
     {
-        // bots unique = includeBots - humans (safe enough for v1)
-        $all = $this->uniqueToday(true);
-        $hum = $this->uniqueToday(false);
-        return max(0, $all - $hum);
+        $hostKey = $host ? strtolower($host) : 'all';
+
+        return $this->cached("uniqueBotsToday:$hostKey", 30, function () use ($host) {
+            $start = Carbon::today();
+            $end   = Carbon::tomorrow();
+
+            $q = TrafficSession::query()
+                ->whereBetween('first_seen_at', [$start, $end])
+                ->where('is_bot', true);
+
+            if ($host) $q->where('host', $host);
+
+            return (int) $q->distinct('visitor_key')->count('visitor_key');
+        });
     }
 
     /**
      * Pageviews today
      */
-    public function pageviewsToday(bool $includeBots = false): int
+    public function pageviewsToday(bool $includeBots = false, ?string $host = null): int
     {
-        return $this->cached("pageviewsToday:$includeBots", 30, function () use ($includeBots) {
+        $hostKey = $host ? strtolower($host) : 'all';
+
+        return $this->cached("pageviewsToday:$includeBots:$hostKey", 30, function () use ($includeBots, $host) {
             $start = Carbon::today();
-            $end = Carbon::tomorrow();
+            $end   = Carbon::tomorrow();
 
             $q = TrafficPageview::query()->whereBetween('viewed_at', [$start, $end]);
+
+            if ($host) $q->where('host', $host);
             if (! $includeBots) $q->where('is_bot', false);
 
             return (int) $q->count();
@@ -104,16 +136,19 @@ class TrafficStats
     /**
      * Top pages today (by path).
      */
-    public function topPagesToday(int $limit = 10, bool $includeBots = false): array
+    public function topPagesToday(int $limit = 10, bool $includeBots = false, ?string $host = null): array
     {
-        return $this->cached("topPagesToday:$limit:$includeBots", 60, function () use ($limit, $includeBots) {
+        $hostKey = $host ? strtolower($host) : 'all';
+
+        return $this->cached("topPagesToday:$limit:$includeBots:$hostKey", 60, function () use ($limit, $includeBots, $host) {
             $start = Carbon::today();
-            $end = Carbon::tomorrow();
+            $end   = Carbon::tomorrow();
 
             $q = TrafficPageview::query()
                 ->select('path', DB::raw('COUNT(*) as hits'))
                 ->whereBetween('viewed_at', [$start, $end]);
 
+            if ($host) $q->where('host', $host);
             if (! $includeBots) $q->where('is_bot', false);
 
             return $q->groupBy('path')
@@ -128,17 +163,22 @@ class TrafficStats
     /**
      * Top bots today (by bot_name).
      */
-    public function topBotsToday(int $limit = 10): array
+    public function topBotsToday(int $limit = 10, ?string $host = null): array
     {
-        return $this->cached("topBotsToday:$limit", 60, function () use ($limit) {
-            $start = Carbon::today();
-            $end = Carbon::tomorrow();
+        $hostKey = $host ? strtolower($host) : 'all';
 
-            return TrafficPageview::query()
+        return $this->cached("topBotsToday:$limit:$hostKey", 60, function () use ($limit, $host) {
+            $start = Carbon::today();
+            $end   = Carbon::tomorrow();
+
+            $q = TrafficPageview::query()
                 ->select('bot_name', DB::raw('COUNT(*) as hits'))
                 ->whereBetween('viewed_at', [$start, $end])
-                ->where('is_bot', true)
-                ->groupBy('bot_name')
+                ->where('is_bot', true);
+
+            if ($host) $q->where('host', $host);
+
+            return $q->groupBy('bot_name')
                 ->orderByDesc('hits')
                 ->limit($limit)
                 ->get()
@@ -150,11 +190,13 @@ class TrafficStats
     /**
      * Top referrers today (from session referrer).
      */
-    public function topReferrersToday(int $limit = 10, bool $includeBots = false): array
+    public function topReferrersToday(int $limit = 10, bool $includeBots = false, ?string $host = null): array
     {
-        return $this->cached("topReferrersToday:$limit:$includeBots", 120, function () use ($limit, $includeBots) {
+        $hostKey = $host ? strtolower($host) : 'all';
+
+        return $this->cached("topReferrersToday:$limit:$includeBots:$hostKey", 120, function () use ($limit, $includeBots, $host) {
             $start = Carbon::today();
-            $end = Carbon::tomorrow();
+            $end   = Carbon::tomorrow();
 
             $q = TrafficSession::query()
                 ->select('referrer', DB::raw('COUNT(*) as hits'))
@@ -162,6 +204,7 @@ class TrafficStats
                 ->whereNotNull('referrer')
                 ->where('referrer', '!=', '');
 
+            if ($host) $q->where('host', $host);
             if (! $includeBots) $q->where('is_bot', false);
 
             return $q->groupBy('referrer')
@@ -175,12 +218,12 @@ class TrafficStats
 
     /**
      * Small cache helper.
-     * TTL seconds are intentionally short (dashboard-ish).
+     * TTL seconds are intentionally short (dashboard)
      */
     protected function cached(string $key, int $ttlSeconds, \Closure $fn)
     {
         $enabled = (bool) config('traffic-sentinel.cache.enabled', true);
-        $prefix = (string) config('traffic-sentinel.cache.prefix', 'traffic_sentinel:');
+        $prefix  = (string) config('traffic-sentinel.cache.prefix', 'traffic_sentinel:');
 
         if (! $enabled) return $fn();
 
