@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/kianisanaullah/traffic-sentinel/main/resources/assets/logo.svg"
+  <img src="https://raw.githubusercontent.com/kianisanaullah/laravel-traffic-sentinel/main/resources/assets/logo.svg"
        alt="Traffic Sentinel Logo"
        width="160">
 </p>
