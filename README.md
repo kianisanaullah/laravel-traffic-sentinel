@@ -29,7 +29,7 @@
 ## 📦 Installation
 
 ```bash
-composer require kianisanaullah/traffic-sentinel
+composer require kianisanaullah/laravel-traffic-sentinel
 ```
 
 ## Publish config & migrations:
