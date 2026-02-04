@@ -1,0 +1,26 @@
+{
+  "name": "kianisanaullah/traffic-sentinel",
+  "description": "Traffic Sentinel for Laravel: tracks visitors + bots, online presence, and traffic stats.",
+  "type": "library",
+  "license": "MIT",
+  "autoload": {
+    "psr-4": {
+      "Kianisanaullah\\TrafficSentinel\\": "src/"
+    }
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "Kianisanaullah\\TrafficSentinel\\TrafficSentinelServiceProvider"
+      ]
+    }
+  },
+  "require": {
+    "php": "^8.2",
+    "illuminate/support": "^12.0",
+    "illuminate/http": "^12.0",
+    "illuminate/database": "^12.0"
+  },
+  "minimum-stability": "dev",
+  "prefer-stable": true
+}

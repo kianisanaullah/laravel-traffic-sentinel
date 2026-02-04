@@ -1,3 +1,11 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/kianisanaullah/traffic-sentinel/main/resources/assets/logo.svg"
+       alt="Traffic Sentinel Logo"
+       width="160">
+</p>
+
+<h1 align="center">Traffic Sentinel</h1>
+
 # Traffic Sentinel
 
 🚦 **Traffic Sentinel** is a lightweight Laravel package to track **real visitors vs bots**, online users, pageviews, referrers, and crawler activity — with a modern dashboard.
