@@ -53,7 +53,7 @@ return [
         'path' => 'admin/traffic-sentinel',
         // Middleware stack for dashboard route
         // You can change in published config to ['web','auth'] or your admin middleware
-        'middleware' => ['web'],
+        'middleware' => ['web','admin'],
     ],
     'exclude' => [
 
@@ -93,7 +93,22 @@ return [
          */
 
         'hosts' => [
-            // '127.0.0.1',
+            'localhost',
+            '127.0.0.1',
+            '976-tuna.com',
+            'www.976-tuna.com',
         ],
+        'ips' => [
+            '127.0.0.1',
+            '::1',
+        ],
+        'user_agents' => [
+            'UptimeRobot',
+            'Pingdom',
+        ],
+
+    ],
+    'middleware' => [
+        'auto_register' => false,
     ],
 ];
