@@ -28,7 +28,7 @@ class TrafficSentinelServiceProvider extends ServiceProvider
 
         // Migrations
         $this->publishes([
-            __DIR__ . '/../database/migrations' => database_path('migrations'),
+            __DIR__ . '/Database/migrations' => database_path('migrations'),
         ], 'traffic-sentinel-migrations');
 
         // Assets
