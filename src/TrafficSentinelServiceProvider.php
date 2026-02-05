@@ -3,6 +3,7 @@
 namespace Kianisanaullah\TrafficSentinel;
 
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Pagination\Paginator;
 use Kianisanaullah\TrafficSentinel\Console\Commands\TrafficPruneCommand;
 use Kianisanaullah\TrafficSentinel\Http\Middleware\TrackTraffic;
 use Kianisanaullah\TrafficSentinel\Services\TrafficStats;
@@ -22,6 +23,8 @@ class TrafficSentinelServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        Paginator::useBootstrapFive();
+
         $router = $this->app['router'];
 
         /* -------------------------------------------------

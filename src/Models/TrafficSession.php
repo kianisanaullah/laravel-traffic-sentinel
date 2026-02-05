@@ -7,12 +7,13 @@ use Illuminate\Database\Eloquent\Model;
 class TrafficSession extends Model
 {
     protected $table = 'traffic_sessions';
+
     protected $guarded = [];
 
     protected $casts = [
+        'is_bot' => 'boolean',
         'first_seen_at' => 'datetime',
         'last_seen_at' => 'datetime',
-        'is_bot' => 'boolean',
     ];
 
     public function pageviews()
