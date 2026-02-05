@@ -33,7 +33,11 @@ class TrackTraffic
                 $visitorId
             );
         } catch (\Throwable $e) {
-
+            \Log::error('TrafficSentinel track failed', [
+                'msg' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
         }
 
         return $response;

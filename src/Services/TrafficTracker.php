@@ -210,7 +210,7 @@ class TrafficTracker
         if ($visitorId !== '') {
             return 'vid_' . substr(hash('sha256', strtolower($visitorId)), 0, 32);
         }
-        
+
         $uaShort = substr(hash('sha1', strtolower($ua)), 0, 16);
         $ipPart  = $ipStored ? substr(hash('sha1', $ipStored), 0, 16) : 'noip';
 
