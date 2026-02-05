@@ -20,9 +20,6 @@ class TrafficTracker
         $sessionId = $this->getSessionId($request);
         $ua = (string) $request->userAgent();
         $ipStored = $this->ipToStore($request->ip());
-        $ipReal = (string) $request->ip();
-        $ipRaw = config('traffic-sentinel.privacy.store_raw_ip', false) ? ($ipReal ?: null) : null;
-
 
         $visitorKey = $this->makeVisitorKey($ipStored, $ua, $visitorId);
 
@@ -48,7 +45,6 @@ class TrafficTracker
             $sessionId,
             $visitorKey,
             $ipStored,
-            $ipRaw,
             $ua,
             $deviceType,
             $ref,
@@ -75,7 +71,6 @@ class TrafficTracker
                     'visitor_key'   => $visitorKey,
                     'host'          => $host,
                     'ip'            => $ipStored,
-                    'ip_raw'        => $ipRaw,
                     'user_agent'    => Str::limit($ua, 500, ''),
                     'device_type'   => $deviceType,
                     'referrer'      => Str::limit($ref ?: null, 500, ''),
@@ -92,7 +87,6 @@ class TrafficTracker
                     'user_id'      => $userId ?? $session->user_id,
                     'is_bot'       => $session->is_bot || $isBot,
                     'bot_name'     => $session->bot_name ?: $botName,
-                    'ip_raw'       => $session->ip_raw ?: $ipRaw,
 
 
                     'host'         => $session->host ?: $host,
@@ -216,7 +210,7 @@ class TrafficTracker
         if ($visitorId !== '') {
             return 'vid_' . substr(hash('sha256', strtolower($visitorId)), 0, 32);
         }
-
+        
         $uaShort = substr(hash('sha1', strtolower($ua)), 0, 16);
         $ipPart  = $ipStored ? substr(hash('sha1', $ipStored), 0, 16) : 'noip';
 
