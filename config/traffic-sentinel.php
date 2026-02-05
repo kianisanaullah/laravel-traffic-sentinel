@@ -94,9 +94,7 @@ return [
 
         'hosts' => [
             'localhost',
-            '127.0.0.1',
-            '976-tuna.com',
-            'www.976-tuna.com',
+            '127.0.0.1'
         ],
         'ips' => [
             '127.0.0.1',
