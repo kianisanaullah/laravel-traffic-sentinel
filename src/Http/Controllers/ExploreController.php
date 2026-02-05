@@ -83,23 +83,30 @@ class ExploreController extends Controller
 
         $q = TrafficSession::query()
             ->select('visitor_key', 'host')
-            ->selectRaw('MAX(last_seen_at) as last_seen_at')
-            ->selectRaw('MIN(first_seen_at) as first_seen_at')
+
+            ->selectRaw('MAX(ip) as ip')
+            ->selectRaw('MAX(user_agent) as user_agent')
+
             ->selectRaw('COUNT(*) as sessions')
+            ->selectRaw('MIN(first_seen_at) as first_seen_at')
+            ->selectRaw('MAX(last_seen_at) as last_seen_at')
+
             ->whereBetween('first_seen_at', [$start, $end])
             ->where('is_bot', false);
 
-        if ($host) $q->where('host', $host);
+        if ($host) {
+            $q->where('host', $host);
+        }
 
         $q->groupBy('visitor_key', 'host')
-          ->orderByDesc('last_seen_at');
+            ->orderByDesc('last_seen_at');
 
         return view('traffic-sentinel::explore.unique_humans', [
             'title' => 'Unique Humans',
-            'rows' => $q->paginate(30)->withQueryString(),
+            'rows'  => $q->paginate(30)->withQueryString(),
             'range' => $range,
-            'days' => $days,
-            'host' => $host,
+            'days'  => $days,
+            'host'  => $host,
         ]);
     }
 
@@ -110,23 +117,30 @@ class ExploreController extends Controller
 
         $q = TrafficSession::query()
             ->select('visitor_key', 'bot_name', 'host')
-            ->selectRaw('MAX(last_seen_at) as last_seen_at')
-            ->selectRaw('MIN(first_seen_at) as first_seen_at')
+
+            ->selectRaw('MAX(ip) as ip')
+            ->selectRaw('MAX(user_agent) as user_agent')
+
             ->selectRaw('COUNT(*) as sessions')
+            ->selectRaw('MIN(first_seen_at) as first_seen_at')
+            ->selectRaw('MAX(last_seen_at) as last_seen_at')
+
             ->whereBetween('first_seen_at', [$start, $end])
             ->where('is_bot', true);
 
-        if ($host) $q->where('host', $host);
+        if ($host) {
+            $q->where('host', $host);
+        }
 
         $q->groupBy('visitor_key', 'bot_name', 'host')
-          ->orderByDesc('last_seen_at');
+            ->orderByDesc('last_seen_at');
 
         return view('traffic-sentinel::explore.unique_bots', [
             'title' => 'Unique Bots',
-            'rows' => $q->paginate(30)->withQueryString(),
+            'rows'  => $q->paginate(30)->withQueryString(),
             'range' => $range,
-            'days' => $days,
-            'host' => $host,
+            'days'  => $days,
+            'host'  => $host,
         ]);
     }
 
@@ -248,6 +262,29 @@ class ExploreController extends Controller
             'days' => $days,
             'host' => $host,
             'referrer' => Str::limit($ref, 140),
+        ]);
+    }
+    public function sessionShow($id)
+    {
+        $row = TrafficSession::query()
+            ->with(['pageviews' => fn($q) => $q->latest('viewed_at')->limit(50)])
+            ->findOrFail($id);
+
+        $geo = null;
+
+        // Only if the host app has geoip() available (spatie/laravel-geoip or torann/geoip, etc.)
+        try {
+            if (function_exists('geoip') && $row->ip) {
+                $geo = geoip($row->ip)->toArray();
+            }
+        } catch (\Throwable $e) {
+            $geo = null;
+        }
+
+        return view('traffic-sentinel::explore.session_show', [
+            'title' => 'Session Details',
+            'row' => $row,
+            'geo' => $geo,
         ]);
     }
 }

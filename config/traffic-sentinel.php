@@ -122,4 +122,5 @@ return [
     'tracking' => [
         'include_host' => true,
     ],
+    'store_raw_ip' => env('TRAFFIC_SENTINEL_STORE_RAW_IP', true),
 ];
