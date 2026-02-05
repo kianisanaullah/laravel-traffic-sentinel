@@ -60,7 +60,9 @@
             color: #e8eefc;
         }
 
-        .ts-shell{ max-width: 1180px; }
+        .ts-shell{
+            max-width: 100%;
+        }
 
         .ts-header{
             border: 1px solid var(--ts-line);
@@ -225,7 +227,7 @@
 </head>
 
 <body class="py-4">
-<div class="container ts-shell">
+<div class="container-fluid ts-shell px-4 px-xxl-5">
 
     {{-- Header --}}
     <div class="ts-header p-3 p-md-4 mb-3">

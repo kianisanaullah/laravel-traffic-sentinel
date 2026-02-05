@@ -1,3 +1,5 @@
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/datatables.net-bs5@1.13.8/css/dataTables.bootstrap5.min.css">
 <style>
     :root{
         --ts-bg: #0b1220;

@@ -21,3 +21,32 @@
     });
 })();
 </script>
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/datatables.net@1.13.8/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/datatables.net-bs5@1.13.8/js/dataTables.bootstrap5.min.js"></script>
+<script>
+    window.TS = window.TS || {};
+
+    TS.initDataTable = function(selector, opts){
+        if (!window.jQuery || !$.fn.DataTable) return;
+
+        const $el = $(selector);
+        if (!$el.length) return;
+
+        // avoid double init
+        if ($.fn.DataTable.isDataTable($el[0])) return;
+
+        $el.DataTable(Object.assign({
+            pageLength: 25,
+            lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+            order: [],
+            stateSave: true,
+            responsive: true,
+            autoWidth: false,
+            language: {
+                search: "_INPUT_",
+                searchPlaceholder: "Search...",
+            }
+        }, opts || {}));
+    };
+</script>

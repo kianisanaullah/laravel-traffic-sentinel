@@ -22,29 +22,28 @@
 </head>
 
 <body class="py-4">
-<div class="container ts-shell">
 
-    {{-- Big header (logo + filters) --}}
-    @include('traffic-sentinel::partials.header')
+<div class="container-fluid px-3 px-lg-4">
+    <div class="ts-shell-wide mx-auto">
 
-    {{-- Tabs / section header --}}
-    @php
-        $host  = request('host');
-        $range = request('range', 'today');
-    @endphp
+        {{-- Big header (logo + filters) --}}
+        @include('traffic-sentinel::partials.header')
 
+        {{-- Page content --}}
+        @yield('content')
 
+        <div class="ts-foot mt-3">
+            <i class="bi bi-lock me-1"></i>
+            Tip: protect dashboard with middleware in
+            <code>config/traffic-sentinel.php</code> in production.
+        </div>
 
-    {{-- Page content --}}
-    @yield('content')
-
-    <div class="ts-foot mt-3">
-        <i class="bi bi-lock me-1"></i>
-        Tip: protect dashboard with middleware in <code>config/traffic-sentinel.php</code> in production.
     </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 @include('traffic-sentinel::partials.scripts')
+
+@stack('scripts')
 </body>
 </html>

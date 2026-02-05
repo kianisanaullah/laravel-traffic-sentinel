@@ -8,7 +8,7 @@
         </div>
 
         <div class="table-responsive">
-            <table class="table ts-table table-hover mb-0">
+            <table id="tsTable" class="table ts-table table-hover mb-0">
                 <thead>
                 <tr>
                     <th>Host</th>
@@ -66,3 +66,15 @@
         <div class="mt-3">{{ $rows->withQueryString()->links('pagination::bootstrap-5') }}</div>
     </div>
 @endsection
+@push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            TS.initDataTable('#tsTable', {
+                order: [[5, 'desc']],
+                paging: false,
+                info: false,
+                lengthChange: false,
+            });
+        });
+    </script>
+@endpush
