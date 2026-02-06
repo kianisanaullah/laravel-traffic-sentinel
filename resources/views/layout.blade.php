@@ -44,6 +44,10 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 @include('traffic-sentinel::partials.scripts')
 
+@if(config('traffic-sentinel.ui.ip_modal.enabled', true))
+    @include('traffic-sentinel::partials.ip-modal')
+    @include('traffic-sentinel::partials.ip-modal-scripts')
+@endif
 @stack('scripts')
 </body>
 </html>

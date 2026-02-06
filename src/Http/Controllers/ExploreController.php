@@ -8,6 +8,7 @@ use Illuminate\Routing\Controller;
 use Illuminate\Support\Str;
 use Kianisanaullah\TrafficSentinel\Models\TrafficPageview;
 use Kianisanaullah\TrafficSentinel\Models\TrafficSession;
+use Kianisanaullah\TrafficSentinel\Services\RuntimeIpLookupService;
 
 class ExploreController extends Controller
 {
@@ -285,6 +286,23 @@ class ExploreController extends Controller
             'title' => 'Session Details',
             'row' => $row,
             'geo' => $geo,
+        ]);
+    }
+    public function ipLookup(Request $request, RuntimeIpLookupService $lookup)
+    {
+        $ip = trim((string) $request->get('ip', ''));
+
+        // Basic validation (v4/v6)
+        if ($ip === '' || filter_var($ip, FILTER_VALIDATE_IP) === false) {
+            return response()->json(['ok' => false, 'message' => 'Invalid IP'], 422);
+        }
+
+        $data = $lookup->lookup($ip);
+
+        return response()->json([
+            'ok' => true,
+            'ip' => $ip,
+            'data' => $data,
         ]);
     }
 }

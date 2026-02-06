@@ -4,11 +4,15 @@ namespace Kianisanaullah\TrafficSentinel;
 
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Pagination\Paginator;
+use Kianisanaullah\TrafficSentinel\Console\Commands\IpDataInstallCommand;
 use Kianisanaullah\TrafficSentinel\Console\Commands\TrafficPruneCommand;
+use Kianisanaullah\TrafficSentinel\Console\Commands\TrafficSentinelInstallIpData;
 use Kianisanaullah\TrafficSentinel\Http\Middleware\TrackTraffic;
 use Kianisanaullah\TrafficSentinel\Services\TrafficStats;
 use Kianisanaullah\TrafficSentinel\Services\TrafficStatsRange;
 use Kianisanaullah\TrafficSentinel\Services\TrafficTracker;
+use Kianisanaullah\TrafficSentinel\Services\RuntimeIpLookupService;
+
 
 class TrafficSentinelServiceProvider extends ServiceProvider
 {
@@ -19,6 +23,7 @@ class TrafficSentinelServiceProvider extends ServiceProvider
         $this->app->singleton(TrafficTracker::class, fn () => new TrafficTracker());
         $this->app->singleton(TrafficStats::class, fn () => new TrafficStats());
         $this->app->singleton(TrafficStatsRange::class, fn () => new TrafficStatsRange());
+        $this->app->singleton(RuntimeIpLookupService::class, fn () => new RuntimeIpLookupService());
     }
 
     public function boot(): void
@@ -67,6 +72,10 @@ class TrafficSentinelServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 TrafficPruneCommand::class,
+            ]);
+            $this->commands([
+                TrafficPruneCommand::class,
+                IpDataInstallCommand::class,
             ]);
         }
     }

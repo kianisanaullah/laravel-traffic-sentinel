@@ -29,13 +29,8 @@
                         <td class="text-break">{{ $r->host }}</td>
 
                         <td class="text-break">
-                            @if(config('traffic-sentinel.ip.store') === 'hashed')
-                                <span class="text-muted">Hashed</span>
-                            @else
-                                <code>{{ $r->ip ?? '—' }}</code>
-                            @endif
+                            @include('traffic-sentinel::partials.ip-cell', ['ip' => ($r->ip_raw ?? $r->ip)])
                         </td>
-
                         <td class="text-break">
                             <div class="fw-semibold">{{ \Kianisanaullah\TrafficSentinel\Support\UserAgentParser::label($p) }}</div>
                             <div class="text-muted small" title="{{ $p['ua'] }}">

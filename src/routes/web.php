@@ -29,6 +29,8 @@ Route::group([
     // Drilldowns
     Route::get('/pages/path', [ExploreController::class, 'pageviewsByPath'])->name('traffic-sentinel.pages.path');
     Route::get('/referrers/show', [ExploreController::class, 'sessionsByReferrer'])->name('traffic-sentinel.referrers.show');
+    Route::get('/ip/lookup', [ExploreController::class, 'ipLookup'])
+        ->name('traffic-sentinel.ip.lookup');
 });
 
 Route::get(

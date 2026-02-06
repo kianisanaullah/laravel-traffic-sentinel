@@ -26,7 +26,7 @@
                 </div>
 
                 <div class="small text-muted mt-3">IP Address</div>
-                <div class="fw-semibold">{{ $row->ip ?? '—' }}</div>
+                <div class="fw-semibold"> @include('traffic-sentinel::partials.ip-cell', ['ip' => ($r->ip_raw ?? $r->ip)])</div>
 
                 <div class="small text-muted mt-3">Device</div>
                 <div>{{ ucfirst($row->device_type ?? 'unknown') }}</div>
