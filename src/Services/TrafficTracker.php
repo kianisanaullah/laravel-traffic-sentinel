@@ -24,6 +24,7 @@ class TrafficTracker
         $visitorKey = $this->makeVisitorKey($ipStored, $ua, $visitorId);
 
         $host = strtolower((string) $request->getHost());
+        $appKey = $this->appKey();
 
         [$isBot, $botName] = $this->detectBot($request);
 
@@ -58,7 +59,8 @@ class TrafficTracker
             $request,
             $isBot,
             $botName,
-            $host
+            $host,
+            $appKey
         ) {
             /** @var TrafficSession|null $session */
             $session = TrafficSession::query()
@@ -80,6 +82,7 @@ class TrafficTracker
                     'user_id'       => $userId,
                     'is_bot'        => $isBot,
                     'bot_name'      => $botName,
+                    'app_key'       => $appKey,
                 ]);
             } else {
                 $session->update([
@@ -90,6 +93,7 @@ class TrafficTracker
 
 
                     'host'         => $session->host ?: $host,
+                    'app_key'      => $session->app_key ?: $appKey,
                 ]);
             }
 
@@ -105,6 +109,7 @@ class TrafficTracker
                 'viewed_at'           => $now,
                 'is_bot'              => $isBot,
                 'bot_name'            => $botName,
+                'app_key'            => $appKey,
             ]);
         });
     }
@@ -215,5 +220,22 @@ class TrafficTracker
         $ipPart  = $ipStored ? substr(hash('sha1', $ipStored), 0, 16) : 'noip';
 
         return $ipPart . '-' . $uaShort;
+    }
+    protected function appKey(): ?string
+    {
+        $key = config('traffic-sentinel.tracking.app_key');
+
+        if (is_string($key)) {
+            $key = trim($key);
+            if ($key !== '') return Str::limit($key, 50, '');
+        }
+
+        // optional fallback (safe)
+        $fallback = config('app.name');
+        if (is_string($fallback) && trim($fallback) !== '') {
+            return Str::limit(trim($fallback), 50, '');
+        }
+
+        return null;
     }
 }
