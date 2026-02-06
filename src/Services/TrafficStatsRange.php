@@ -10,78 +10,136 @@ use Kianisanaullah\TrafficSentinel\Models\TrafficSession;
 
 class TrafficStatsRange
 {
-    public function uniqueHumansLastDays(int $days, ?string $host = null): int
+    public function uniqueHumansLastDays(int $days, ?string $host = null, ?string $appKey = null): int
     {
         $hostKey = $host ? strtolower($host) : 'all';
+        $appKeyK = $appKey ? strtolower($appKey) : 'all';
 
-        return $this->cached("uniqueHumansLastDays:$days:$hostKey", 60, function () use ($days, $host) {
+        return $this->cached("uniqueHumansLastDays:$days:$hostKey:$appKeyK", 60, function () use ($days, $host, $appKey) {
             [$start, $end] = $this->range($days);
 
             $q = TrafficSession::query()
                 ->whereBetween('first_seen_at', [$start, $end])
                 ->where('is_bot', false);
 
-            if ($host) $q->where('host', $host);
+            if ($host)   $q->where('host', $host);
+            if ($appKey) $q->where('app_key', $appKey);
 
             return (int) $q->distinct('visitor_key')->count('visitor_key');
         });
     }
 
-    public function uniqueBotsLastDays(int $days, ?string $host = null): int
+    public function uniqueBotsLastDays(int $days, ?string $host = null, ?string $appKey = null): int
     {
         $hostKey = $host ? strtolower($host) : 'all';
+        $appKeyK = $appKey ? strtolower($appKey) : 'all';
 
-        return $this->cached("uniqueBotsLastDays:$days:$hostKey", 60, function () use ($days, $host) {
+        return $this->cached("uniqueBotsLastDays:$days:$hostKey:$appKeyK", 60, function () use ($days, $host, $appKey) {
             [$start, $end] = $this->range($days);
 
             $q = TrafficSession::query()
                 ->whereBetween('first_seen_at', [$start, $end])
                 ->where('is_bot', true);
 
-            if ($host) $q->where('host', $host);
+            if ($host)   $q->where('host', $host);
+            if ($appKey) $q->where('app_key', $appKey);
 
             return (int) $q->distinct('visitor_key')->count('visitor_key');
         });
     }
 
-    public function pageviewsHumansLastDays(int $days, ?string $host = null): int
+    /**
+     * Unique IPs last N days (Humans)
+     * Uses traffic_sessions.ip (hashed/full) so it works with privacy mode too.
+     */
+    public function uniqueIpsHumansLastDays(int $days, ?string $host = null, ?string $appKey = null): int
     {
         $hostKey = $host ? strtolower($host) : 'all';
+        $appKeyK = $appKey ? strtolower($appKey) : 'all';
 
-        return $this->cached("pageviewsHumansLastDays:$days:$hostKey", 60, function () use ($days, $host) {
+        return $this->cached("uniqueIpsHumansLastDays:$days:$hostKey:$appKeyK", 90, function () use ($days, $host, $appKey) {
+            [$start, $end] = $this->range($days);
+
+            $q = TrafficSession::query()
+                ->whereBetween('first_seen_at', [$start, $end])
+                ->where('is_bot', false)
+                ->whereNotNull('ip')
+                ->where('ip', '!=', '');
+
+            if ($host)   $q->where('host', $host);
+            if ($appKey) $q->where('app_key', $appKey);
+
+            return (int) $q->distinct('ip')->count('ip');
+        });
+    }
+
+    /**
+     * Unique IPs last N days (Bots)
+     */
+    public function uniqueIpsBotsLastDays(int $days, ?string $host = null, ?string $appKey = null): int
+    {
+        $hostKey = $host ? strtolower($host) : 'all';
+        $appKeyK = $appKey ? strtolower($appKey) : 'all';
+
+        return $this->cached("uniqueIpsBotsLastDays:$days:$hostKey:$appKeyK", 90, function () use ($days, $host, $appKey) {
+            [$start, $end] = $this->range($days);
+
+            $q = TrafficSession::query()
+                ->whereBetween('first_seen_at', [$start, $end])
+                ->where('is_bot', true)
+                ->whereNotNull('ip')
+                ->where('ip', '!=', '');
+
+            if ($host)   $q->where('host', $host);
+            if ($appKey) $q->where('app_key', $appKey);
+
+            return (int) $q->distinct('ip')->count('ip');
+        });
+    }
+
+    public function pageviewsHumansLastDays(int $days, ?string $host = null, ?string $appKey = null): int
+    {
+        $hostKey = $host ? strtolower($host) : 'all';
+        $appKeyK = $appKey ? strtolower($appKey) : 'all';
+
+        return $this->cached("pageviewsHumansLastDays:$days:$hostKey:$appKeyK", 60, function () use ($days, $host, $appKey) {
             [$start, $end] = $this->range($days);
 
             $q = TrafficPageview::query()
                 ->whereBetween('viewed_at', [$start, $end])
                 ->where('is_bot', false);
 
-            if ($host) $q->where('host', $host);
+            if ($host)   $q->where('host', $host);
+            if ($appKey) $q->where('app_key', $appKey);
 
             return (int) $q->count();
         });
     }
 
-    public function pageviewsAllLastDays(int $days, ?string $host = null): int
+    public function pageviewsAllLastDays(int $days, ?string $host = null, ?string $appKey = null): int
     {
         $hostKey = $host ? strtolower($host) : 'all';
+        $appKeyK = $appKey ? strtolower($appKey) : 'all';
 
-        return $this->cached("pageviewsAllLastDays:$days:$hostKey", 60, function () use ($days, $host) {
+        return $this->cached("pageviewsAllLastDays:$days:$hostKey:$appKeyK", 60, function () use ($days, $host, $appKey) {
             [$start, $end] = $this->range($days);
 
             $q = TrafficPageview::query()
                 ->whereBetween('viewed_at', [$start, $end]);
 
-            if ($host) $q->where('host', $host);
+            if ($host)   $q->where('host', $host);
+            if ($appKey) $q->where('app_key', $appKey);
 
             return (int) $q->count();
         });
     }
 
-    public function topPagesHumansLastDays(int $days, int $limit = 10, ?string $host = null): array
+    public function topPagesHumansLastDays(int $days, int $limit = 10, ?string $host = null, ?string $appKey = null): array
     {
         $hostKey = $host ? strtolower($host) : 'all';
+        $appKeyK = $appKey ? strtolower($appKey) : 'all';
 
-        return $this->cached("topPagesHumansLastDays:$days:$limit:$hostKey", 120, function () use ($days, $limit, $host) {
+        return $this->cached("topPagesHumansLastDays:$days:$limit:$hostKey:$appKeyK", 120, function () use ($days, $limit, $host, $appKey) {
             [$start, $end] = $this->range($days);
 
             $q = TrafficPageview::query()
@@ -89,7 +147,8 @@ class TrafficStatsRange
                 ->whereBetween('viewed_at', [$start, $end])
                 ->where('is_bot', false);
 
-            if ($host) $q->where('host', $host);
+            if ($host)   $q->where('host', $host);
+            if ($appKey) $q->where('app_key', $appKey);
 
             return $q->groupBy('path')
                 ->orderByDesc('hits')
@@ -100,11 +159,12 @@ class TrafficStatsRange
         });
     }
 
-    public function topBotsLastDays(int $days, int $limit = 10, ?string $host = null): array
+    public function topBotsLastDays(int $days, int $limit = 10, ?string $host = null, ?string $appKey = null): array
     {
         $hostKey = $host ? strtolower($host) : 'all';
+        $appKeyK = $appKey ? strtolower($appKey) : 'all';
 
-        return $this->cached("topBotsLastDays:$days:$limit:$hostKey", 120, function () use ($days, $limit, $host) {
+        return $this->cached("topBotsLastDays:$days:$limit:$hostKey:$appKeyK", 120, function () use ($days, $limit, $host, $appKey) {
             [$start, $end] = $this->range($days);
 
             $q = TrafficPageview::query()
@@ -112,7 +172,8 @@ class TrafficStatsRange
                 ->whereBetween('viewed_at', [$start, $end])
                 ->where('is_bot', true);
 
-            if ($host) $q->where('host', $host);
+            if ($host)   $q->where('host', $host);
+            if ($appKey) $q->where('app_key', $appKey);
 
             return $q->groupBy('bot_name')
                 ->orderByDesc('hits')
@@ -123,11 +184,12 @@ class TrafficStatsRange
         });
     }
 
-    public function topReferrersHumansLastDays(int $days, int $limit = 10, ?string $host = null): array
+    public function topReferrersHumansLastDays(int $days, int $limit = 10, ?string $host = null, ?string $appKey = null): array
     {
         $hostKey = $host ? strtolower($host) : 'all';
+        $appKeyK = $appKey ? strtolower($appKey) : 'all';
 
-        return $this->cached("topReferrersHumansLastDays:$days:$limit:$hostKey", 180, function () use ($days, $limit, $host) {
+        return $this->cached("topReferrersHumansLastDays:$days:$limit:$hostKey:$appKeyK", 180, function () use ($days, $limit, $host, $appKey) {
             [$start, $end] = $this->range($days);
 
             $q = TrafficSession::query()
@@ -137,7 +199,8 @@ class TrafficStatsRange
                 ->whereNotNull('referrer')
                 ->where('referrer', '!=', '');
 
-            if ($host) $q->where('host', $host);
+            if ($host)   $q->where('host', $host);
+            if ($appKey) $q->where('app_key', $appKey);
 
             return $q->groupBy('referrer')
                 ->orderByDesc('hits')

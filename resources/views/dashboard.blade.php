@@ -27,9 +27,10 @@
             ? asset('vendor/traffic-sentinel/logo.svg')
             : route('traffic-sentinel.asset', ['file' => 'logo.svg']);
 
-        // Keep host/range always in links
+        // Keep host/range/app always in links
         $qHost  = request('host', $selectedHost ?? '');
         $qRange = request('range', $range ?? 'today');
+        $qApp   = request('app', $selectedApp ?? '');
     @endphp
 
     {{-- Favicons --}}
@@ -60,9 +61,7 @@
             color: #e8eefc;
         }
 
-        .ts-shell{
-            max-width: 100%;
-        }
+        .ts-shell{ max-width: 100%; }
 
         .ts-header{
             border: 1px solid var(--ts-line);
@@ -152,10 +151,8 @@
 
         .ts-empty{ padding: 2.2rem 1rem; color: var(--ts-muted); }
         .ts-foot{ color: rgba(255,255,255,.55); font-size: .85rem; }
-
         .ts-logo{ filter: drop-shadow(0 6px 14px rgba(99,102,241,.35)); }
 
-        /* Nav pills */
         .ts-nav .nav-link{
             border-radius: 999px;
             border: 1px solid rgba(255,255,255,.12);
@@ -173,7 +170,6 @@
             color: #fff;
         }
 
-        /* Make whole row clickable */
         .ts-row-link{ cursor: pointer; }
 
         /* Light theme overrides */
@@ -240,6 +236,11 @@
                     <div class="ts-title h4 mb-1">Traffic Sentinel</div>
                     <div class="ts-subtitle">
                         Visitors + Bots monitoring
+
+                        @if(!empty($selectedApp))
+                            <span class="ms-2 ts-badge"><i class="bi bi-boxes me-1"></i>{{ $selectedApp }}</span>
+                        @endif
+
                         @if(!empty($selectedHost))
                             <span class="ms-2 ts-badge"><i class="bi bi-globe2 me-1"></i>{{ $selectedHost }}</span>
                         @else
@@ -256,6 +257,14 @@
                 </span>
 
                 <form method="get" class="d-flex flex-wrap gap-2 align-items-center">
+                    {{-- App filter --}}
+                    <select name="app" class="form-select form-select-sm" onchange="this.form.submit()" style="min-width: 170px;">
+                        <option value="" @selected(empty($selectedApp))>All apps</option>
+                        @foreach(($apps ?? []) as $a)
+                            <option value="{{ $a }}" @selected(($selectedApp ?? null) === $a)>{{ $a }}</option>
+                        @endforeach
+                    </select>
+
                     {{-- Host filter --}}
                     <select name="host" class="form-select form-select-sm" onchange="this.form.submit()" style="min-width: 210px;">
                         <option value="" @selected(empty($selectedHost))>All hosts</option>
@@ -285,37 +294,37 @@
             <ul class="nav nav-pills ts-nav gap-2">
                 <li class="nav-item">
                     <a class="nav-link active"
-                       href="{{ route('traffic-sentinel.dashboard', ['host' => $qHost, 'range' => $qRange]) }}">
+                       href="{{ route('traffic-sentinel.dashboard', ['app' => $qApp, 'host' => $qHost, 'range' => $qRange]) }}">
                         <i class="bi bi-speedometer2 me-1"></i>Overview
                     </a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link"
-                       href="{{ route('traffic-sentinel.online.humans', ['host' => $qHost, 'range' => $qRange]) }}">
+                       href="{{ route('traffic-sentinel.online.humans', ['app' => $qApp, 'host' => $qHost, 'range' => $qRange]) }}">
                         <i class="bi bi-activity me-1"></i>Online
                     </a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link"
-                       href="{{ route('traffic-sentinel.unique.humans', ['host' => $qHost, 'range' => $qRange]) }}">
+                       href="{{ route('traffic-sentinel.unique.humans', ['app' => $qApp, 'host' => $qHost, 'range' => $qRange]) }}">
                         <i class="bi bi-fingerprint me-1"></i>Unique
                     </a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link"
-                       href="{{ route('traffic-sentinel.pageviews.humans', ['host' => $qHost, 'range' => $qRange]) }}">
+                       href="{{ route('traffic-sentinel.pageviews.humans', ['app' => $qApp, 'host' => $qHost, 'range' => $qRange]) }}">
                         <i class="bi bi-eye me-1"></i>Pageviews
                     </a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link"
-                       href="{{ route('traffic-sentinel.pages', ['host' => $qHost, 'range' => $qRange]) }}">
+                       href="{{ route('traffic-sentinel.pages', ['app' => $qApp, 'host' => $qHost, 'range' => $qRange]) }}">
                         <i class="bi bi-signpost-2 me-1"></i>Pages
                     </a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link"
-                       href="{{ route('traffic-sentinel.referrers', ['host' => $qHost, 'range' => $qRange]) }}">
+                       href="{{ route('traffic-sentinel.referrers', ['app' => $qApp, 'host' => $qHost, 'range' => $qRange]) }}">
                         <i class="bi bi-arrow-90deg-left me-1"></i>Referrers
                     </a>
                 </li>
@@ -323,70 +332,60 @@
         </div>
     </div>
 
-    {{-- KPI grid --}}
+    {{-- KPI grid (now 6 cards) --}}
     <div class="row g-3 mb-3">
-        <div class="col-12 col-md-6 col-xl-3">
+        <div class="col-12 col-md-6 col-xl-2">
             <a class="text-decoration-none text-reset d-block"
-               href="{{ route('traffic-sentinel.online.humans', ['host' => $qHost, 'range' => $qRange]) }}">
+               href="{{ route('traffic-sentinel.online.humans', ['app' => $qApp, 'host' => $qHost, 'range' => $qRange]) }}">
                 <div class="ts-kpi p-3">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <div class="label">Online Humans</div>
-                            <div class="value">{{ $onlineHumans }}</div>
-                            <div class="hint">Active in last {{ config('traffic-sentinel.online_minutes', 5) }} min</div>
-                        </div>
-                        <span class="ts-badge"><i class="bi bi-person-check me-1"></i>Live</span>
-                    </div>
+                    <div class="label">Online Humans</div>
+                    <div class="value">{{ $onlineHumans }}</div>
+                    <div class="hint">Last {{ config('traffic-sentinel.online_minutes', 5) }} min</div>
                 </div>
             </a>
         </div>
 
-        <div class="col-12 col-md-6 col-xl-3">
+        <div class="col-12 col-md-6 col-xl-2">
             <a class="text-decoration-none text-reset d-block"
-               href="{{ route('traffic-sentinel.online.bots', ['host' => $qHost, 'range' => $qRange]) }}">
+               href="{{ route('traffic-sentinel.online.bots', ['app' => $qApp, 'host' => $qHost, 'range' => $qRange]) }}">
                 <div class="ts-kpi green p-3">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <div class="label">Online Bots</div>
-                            <div class="value">{{ $onlineBots }}</div>
-                            <div class="hint">Crawlers / tools</div>
-                        </div>
-                        <span class="ts-badge"><i class="bi bi-robot me-1"></i>Live</span>
-                    </div>
+                    <div class="label">Online Bots</div>
+                    <div class="value">{{ $onlineBots }}</div>
+                    <div class="hint">Crawlers / tools</div>
                 </div>
             </a>
         </div>
 
-        <div class="col-12 col-md-6 col-xl-3">
-            <a class="text-decoration-none text-reset d-block"
-               href="{{ route('traffic-sentinel.unique.humans', ['host' => $qHost, 'range' => $qRange]) }}">
-                <div class="ts-kpi orange p-3">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <div class="label">Unique Humans ({{ $range === 'today' ? 'Today' : "Last $days days" }})</div>
-                            <div class="value">{{ $data['unique_humans'] }}</div>
-                            <div class="hint">Distinct visitor keys</div>
-                        </div>
-                        <span class="ts-badge"><i class="bi bi-fingerprint me-1"></i>Unique</span>
-                    </div>
-                </div>
-            </a>
+        <div class="col-12 col-md-6 col-xl-2">
+            <div class="ts-kpi orange p-3">
+                <div class="label">Unique Humans ({{ $range === 'today' ? 'Today' : "Last $days days" }})</div>
+                <div class="value">{{ $data['unique_humans'] ?? 0 }}</div>
+                <div class="hint">Distinct visitor keys</div>
+            </div>
         </div>
 
-        <div class="col-12 col-md-6 col-xl-3">
-            <a class="text-decoration-none text-reset d-block"
-               href="{{ route('traffic-sentinel.unique.bots', ['host' => $qHost, 'range' => $qRange]) }}">
-                <div class="ts-kpi pink p-3">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <div class="label">Unique Bots ({{ $range === 'today' ? 'Today' : "Last $days days" }})</div>
-                            <div class="value">{{ $data['unique_bots'] }}</div>
-                            <div class="hint">Distinct visitor keys</div>
-                        </div>
-                        <span class="ts-badge"><i class="bi bi-shield-check me-1"></i>Detected</span>
-                    </div>
-                </div>
-            </a>
+        <div class="col-12 col-md-6 col-xl-2">
+            <div class="ts-kpi pink p-3">
+                <div class="label">Unique Bots ({{ $range === 'today' ? 'Today' : "Last $days days" }})</div>
+                <div class="value">{{ $data['unique_bots'] ?? 0 }}</div>
+                <div class="hint">Distinct visitor keys</div>
+            </div>
+        </div>
+
+        <div class="col-12 col-md-6 col-xl-2">
+            <div class="ts-kpi p-3">
+                <div class="label">Unique IPs (Humans)</div>
+                <div class="value">{{ $data['unique_ips_humans'] ?? 0 }}</div>
+                <div class="hint">{{ $range === 'today' ? 'Today' : "Last $days days" }}</div>
+            </div>
+        </div>
+
+        <div class="col-12 col-md-6 col-xl-2">
+            <div class="ts-kpi green p-3">
+                <div class="label">Unique IPs (Bots)</div>
+                <div class="value">{{ $data['unique_ips_bots'] ?? 0 }}</div>
+                <div class="hint">{{ $range === 'today' ? 'Today' : "Last $days days" }}</div>
+            </div>
         </div>
     </div>
 
@@ -394,13 +393,13 @@
     <div class="row g-3 mb-3">
         <div class="col-12 col-lg-6">
             <a class="text-decoration-none text-reset d-block"
-               href="{{ route('traffic-sentinel.pageviews.humans', ['host' => $qHost, 'range' => $qRange]) }}">
+               href="{{ route('traffic-sentinel.pageviews.humans', ['app' => $qApp, 'host' => $qHost, 'range' => $qRange]) }}">
                 <div class="ts-card p-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <div class="fw-semibold"><i class="bi bi-eye me-2"></i>Pageviews (Humans)</div>
                         <span class="ts-badge">Range: {{ $range === 'today' ? 'Today' : "Last $days days" }}</span>
                     </div>
-                    <div class="display-6 fw-bold mb-0">{{ $data['pageviews_humans'] }}</div>
+                    <div class="display-6 fw-bold mb-0">{{ $data['pageviews_humans'] ?? 0 }}</div>
                     <div class="ts-subtitle mt-1">Counts only non-bot requests</div>
                 </div>
             </a>
@@ -408,13 +407,13 @@
 
         <div class="col-12 col-lg-6">
             <a class="text-decoration-none text-reset d-block"
-               href="{{ route('traffic-sentinel.pageviews.all', ['host' => $qHost, 'range' => $qRange]) }}">
+               href="{{ route('traffic-sentinel.pageviews.all', ['app' => $qApp, 'host' => $qHost, 'range' => $qRange]) }}">
                 <div class="ts-card p-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <div class="fw-semibold"><i class="bi bi-collection me-2"></i>Pageviews (All)</div>
                         <span class="ts-badge">Humans + Bots</span>
                     </div>
-                    <div class="display-6 fw-bold mb-0">{{ $data['pageviews_all'] }}</div>
+                    <div class="display-6 fw-bold mb-0">{{ $data['pageviews_all'] ?? 0 }}</div>
                     <div class="ts-subtitle mt-1">Includes crawlers and automation</div>
                 </div>
             </a>
@@ -429,13 +428,13 @@
                     <div class="d-flex align-items-center justify-content-between">
                         <div>
                             <a class="text-decoration-none text-reset fw-semibold"
-                               href="{{ route('traffic-sentinel.pages', ['host' => $qHost, 'range' => $qRange]) }}">
+                               href="{{ route('traffic-sentinel.pages', ['app' => $qApp, 'host' => $qHost, 'range' => $qRange]) }}">
                                 <i class="bi bi-signpost-2 me-2"></i>Top Pages (Humans)
                             </a>
                             <div class="ts-subtitle">Most visited paths by humans</div>
                         </div>
                         <a class="btn btn-sm btn-outline-secondary"
-                           href="{{ route('traffic-sentinel.pages', ['host' => $qHost, 'range' => $qRange]) }}">
+                           href="{{ route('traffic-sentinel.pages', ['app' => $qApp, 'host' => $qHost, 'range' => $qRange]) }}">
                             Focus <i class="bi bi-arrow-right ms-1"></i>
                         </a>
                     </div>
@@ -450,10 +449,11 @@
                         </tr>
                         </thead>
                         <tbody>
-                        @forelse($data['top_pages_humans'] as $row)
+                        @forelse(($data['top_pages_humans'] ?? []) as $row)
                             @php
                                 $to = route('traffic-sentinel.pages.path', [
                                     'path' => $row['path'],
+                                    'app' => $qApp,
                                     'host' => $qHost,
                                     'range' => $qRange,
                                 ]);
@@ -495,7 +495,7 @@
                         </tr>
                         </thead>
                         <tbody>
-                        @forelse($data['top_bots'] as $row)
+                        @forelse(($data['top_bots'] ?? []) as $row)
                             <tr>
                                 <td class="text-break">
                                     <span class="ts-badge me-2"><i class="bi bi-cpu"></i></span>
@@ -521,13 +521,13 @@
                     <div class="d-flex align-items-center justify-content-between">
                         <div>
                             <a class="text-decoration-none text-reset fw-semibold"
-                               href="{{ route('traffic-sentinel.referrers', ['host' => $qHost, 'range' => $qRange]) }}">
+                               href="{{ route('traffic-sentinel.referrers', ['app' => $qApp, 'host' => $qHost, 'range' => $qRange]) }}">
                                 <i class="bi bi-arrow-90deg-left me-2"></i>Top Referrers (Humans)
                             </a>
                             <div class="ts-subtitle">Where people are coming from</div>
                         </div>
                         <a class="btn btn-sm btn-outline-secondary"
-                           href="{{ route('traffic-sentinel.referrers', ['host' => $qHost, 'range' => $qRange]) }}">
+                           href="{{ route('traffic-sentinel.referrers', ['app' => $qApp, 'host' => $qHost, 'range' => $qRange]) }}">
                             Focus <i class="bi bi-arrow-right ms-1"></i>
                         </a>
                     </div>
@@ -542,10 +542,11 @@
                         </tr>
                         </thead>
                         <tbody>
-                        @forelse($data['top_referrers'] as $row)
+                        @forelse(($data['top_referrers'] ?? []) as $row)
                             @php
                                 $to = route('traffic-sentinel.referrers.show', [
                                     'referrer' => $row['referrer'],
+                                    'app' => $qApp,
                                     'host' => $qHost,
                                     'range' => $qRange,
                                 ]);
