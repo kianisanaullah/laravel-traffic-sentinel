@@ -8,6 +8,8 @@ return [
     |--------------------------------------------------------------------------
     */
     'tracking' => [
+        'app_key' => env('TRAFFIC_SENTINEL_APP_KEY', env('APP_NAME','app')),
+
         // Track these HTTP methods
         'methods' => ['GET', 'POST'],
 
@@ -72,9 +74,10 @@ return [
         */
         'cache' => [
             'enabled' => true,
-            'prefix'  => 'traffic_sentinel:iplookup:',
+            'prefix'  => 'traffic_sentinel:' . env('TRAFFIC_SENTINEL_APP_KEY','app') . ':',
             'ttl_hours' => 12,
         ],
+
 
         /*
         |--------------------------------------------------------------------------
@@ -178,7 +181,7 @@ return [
     |--------------------------------------------------------------------------
     */
     'cookie' => [
-        'name' => 'ts_vid',
+        'name' => env('TRAFFIC_SENTINEL_COOKIE_NAME', 'ts_vid'),
         'minutes' => 60 * 24 * 365 * 2,
         'domain' => env('TS_COOKIE_DOMAIN', null),
         'secure' => env('TS_COOKIE_SECURE', null),
