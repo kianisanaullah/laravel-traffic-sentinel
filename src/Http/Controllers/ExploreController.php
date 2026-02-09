@@ -9,6 +9,8 @@ use Illuminate\Support\Str;
 use Kianisanaullah\TrafficSentinel\Models\TrafficPageview;
 use Kianisanaullah\TrafficSentinel\Models\TrafficSession;
 use Kianisanaullah\TrafficSentinel\Services\RuntimeIpLookupService;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class ExploreController extends Controller
 {
@@ -304,5 +306,63 @@ class ExploreController extends Controller
             'ip' => $ip,
             'data' => $data,
         ]);
+    }
+    public function uniqueIpsHumans(Request $request)
+    {
+        return $this->uniqueIpsIndex($request, false);
+    }
+
+    public function uniqueIpsBots(Request $request)
+    {
+        return $this->uniqueIpsIndex($request, true);
+    }
+
+    protected function uniqueIpsIndex(Request $request, bool $isBot)
+    {
+        // range
+        $range = $request->get('range', 'today');
+        $days  = $range === '7' ? 7 : ($range === '30' ? 30 : 1);
+
+        [$start, $end] = $this->date_range($days);
+
+        // filters
+        $selectedHost = trim((string) $request->get('host', ''));
+        if ($selectedHost === '') $selectedHost = null;
+
+        $selectedApp = trim((string) $request->get('app', ''));
+        if ($selectedApp === '') $selectedApp = null;
+
+        $rows = DB::table('traffic_sessions as s')
+            ->leftJoin('traffic_pageviews as p', 'p.traffic_session_id', '=', 's.id')
+            ->selectRaw('
+                s.host,
+                COALESCE(s.ip_raw, s.ip) as ip,
+                COUNT(DISTINCT s.id) as sessions,
+                COUNT(p.id) as pageviews,
+                MIN(s.first_seen_at) as first_seen_at,
+                MAX(s.last_seen_at) as last_seen_at
+            ')
+            ->whereBetween('s.first_seen_at', [$start, $end])
+            ->where('s.is_bot', $isBot)
+            ->when($selectedHost, fn ($q) => $q->where('s.host', $selectedHost))
+            ->when($selectedApp, fn ($q) => $q->where('s.app_key', $selectedApp))
+            ->groupBy('s.host', DB::raw('COALESCE(s.ip_raw, s.ip)'))
+            ->orderByDesc('last_seen_at')
+            ->paginate(25)
+            ->withQueryString();
+
+        return view('traffic-sentinel::explore.unique-ips', [
+            'rows'   => $rows,
+            'isBot'  => $isBot,
+            'range'  => $range,
+            'days'   => $days,
+            'title'  => $isBot ? 'Unique IPs (Bots)' : 'Unique IPs (Humans)',
+        ]);
+    }
+    protected function date_range(int $days): array
+    {
+        $end   = Carbon::now();
+        $start = Carbon::now()->subDays($days)->startOfDay();
+        return [$start, $end];
     }
 }

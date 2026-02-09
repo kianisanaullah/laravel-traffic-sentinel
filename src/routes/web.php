@@ -31,6 +31,13 @@ Route::group([
     Route::get('/referrers/show', [ExploreController::class, 'sessionsByReferrer'])->name('traffic-sentinel.referrers.show');
     Route::get('/ip/lookup', [ExploreController::class, 'ipLookup'])
         ->name('traffic-sentinel.ip.lookup');
+
+    // IPs
+    Route::get('/unique-ips/humans', [ExploreController::class, 'uniqueIpsHumans'])
+        ->name('traffic-sentinel.unique.ips.humans');
+
+    Route::get('/unique-ips/bots', [ExploreController::class, 'uniqueIpsBots'])
+        ->name('traffic-sentinel.unique.ips.bots');
 });
 
 Route::get(

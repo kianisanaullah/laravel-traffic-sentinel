@@ -31,6 +31,9 @@
         $qHost  = request('host', $selectedHost ?? '');
         $qRange = request('range', $range ?? 'today');
         $qApp   = request('app', $selectedApp ?? '');
+
+        // Common query array
+        $qs = ['app' => $qApp, 'host' => $qHost, 'range' => $qRange];
     @endphp
 
     {{-- Favicons --}}
@@ -43,181 +46,189 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 
     <style>
-        :root{
+        :root {
             --ts-bg: #0b1220;
-            --ts-card-border: rgba(255,255,255,.12);
-            --ts-soft: rgba(255,255,255,.65);
-            --ts-muted: rgba(255,255,255,.55);
-            --ts-line: rgba(255,255,255,.12);
+            --ts-card-border: rgba(255, 255, 255, .12);
+            --ts-soft: rgba(255, 255, 255, .65);
+            --ts-muted: rgba(255, 255, 255, .55);
+            --ts-line: rgba(255, 255, 255, .12);
             --ts-radius: 16px;
         }
 
-        body{
+        body {
             background:
-                    radial-gradient(1200px 500px at 10% -10%, rgba(99,102,241,.35), transparent 60%),
-                    radial-gradient(900px 450px at 90% 0%, rgba(16,185,129,.25), transparent 55%),
-                    radial-gradient(900px 450px at 20% 100%, rgba(236,72,153,.20), transparent 55%),
+                    radial-gradient(1200px 500px at 10% -10%, rgba(99, 102, 241, .35), transparent 60%),
+                    radial-gradient(900px 450px at 90% 0%, rgba(16, 185, 129, .25), transparent 55%),
+                    radial-gradient(900px 450px at 20% 100%, rgba(236, 72, 153, .20), transparent 55%),
                     var(--ts-bg);
             color: #e8eefc;
         }
 
-        .ts-shell{ max-width: 100%; }
+        .ts-shell { max-width: 100%; }
 
-        .ts-header{
+        .ts-header {
             border: 1px solid var(--ts-line);
-            background: rgba(255,255,255,.04);
+            background: rgba(255, 255, 255, .04);
             border-radius: var(--ts-radius);
             backdrop-filter: blur(10px);
         }
 
-        .ts-title{
+        .ts-title {
             letter-spacing: .2px;
-            font-weight: 700;
+            font-weight: 800;
             line-height: 1.1;
+            font-size: 1.35rem;
         }
 
-        .ts-subtitle{ color: var(--ts-muted); font-size: .95rem; }
+        .ts-subtitle { color: var(--ts-muted); font-size: .95rem; line-height: 1.25; }
 
-        .ts-card{
+        .ts-card {
             border-radius: var(--ts-radius);
             border: 1px solid var(--ts-card-border);
-            background: rgba(255,255,255,.06);
-            box-shadow: 0 18px 40px rgba(0,0,0,.25);
+            background: rgba(255, 255, 255, .06);
+            box-shadow: 0 18px 40px rgba(0, 0, 0, .25);
             backdrop-filter: blur(10px);
         }
 
-        .ts-kpi{
+        .ts-kpi {
             border-radius: var(--ts-radius);
             border: 1px solid var(--ts-card-border);
-            background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.05));
-            box-shadow: 0 18px 40px rgba(0,0,0,.25);
+            background: linear-gradient(180deg, rgba(255, 255, 255, .10), rgba(255, 255, 255, .05));
+            box-shadow: 0 18px 40px rgba(0, 0, 0, .25);
             backdrop-filter: blur(10px);
             overflow: hidden;
             position: relative;
-            transition: transform .12s ease, box-shadow .12s ease;
-        }
-        .ts-kpi:hover{
-            transform: translateY(-2px);
-            box-shadow: 0 22px 50px rgba(0,0,0,.30);
+            transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
         }
 
-        .ts-kpi::before{
-            content:"";
-            position:absolute;
-            inset:-40px -40px auto auto;
+        .ts-kpi:hover { transform: translateY(-2px); box-shadow: 0 22px 50px rgba(0, 0, 0, .30); }
+
+        .ts-kpi::before {
+            content: "";
+            position: absolute;
+            inset: -40px -40px auto auto;
             width: 160px;
             height: 160px;
             border-radius: 999px;
             opacity: .55;
-            background: radial-gradient(circle at 30% 30%, rgba(99,102,241,.9), transparent 60%);
+            background: radial-gradient(circle at 30% 30%, rgba(99, 102, 241, .9), transparent 60%);
         }
-        .ts-kpi.green::before{ background: radial-gradient(circle at 30% 30%, rgba(16,185,129,.9), transparent 60%); }
-        .ts-kpi.pink::before{ background: radial-gradient(circle at 30% 30%, rgba(236,72,153,.9), transparent 60%); }
-        .ts-kpi.orange::before{ background: radial-gradient(circle at 30% 30%, rgba(245,158,11,.95), transparent 60%); }
+        .ts-kpi.green::before { background: radial-gradient(circle at 30% 30%, rgba(16, 185, 129, .9), transparent 60%); }
+        .ts-kpi.pink::before  { background: radial-gradient(circle at 30% 30%, rgba(236, 72, 153, .9), transparent 60%); }
+        .ts-kpi.orange::before{ background: radial-gradient(circle at 30% 30%, rgba(245, 158, 11, .95), transparent 60%); }
 
-        .ts-kpi .label{ color: var(--ts-muted); font-size: .9rem; }
-        .ts-kpi .value{ font-size: 2.1rem; font-weight: 800; letter-spacing: .2px; }
-        .ts-kpi .hint{ color: var(--ts-muted); font-size: .85rem; }
+        .ts-kpi .label { color: var(--ts-muted); font-size: .9rem; }
+        .ts-kpi .value { font-size: 2.1rem; font-weight: 900; letter-spacing: .2px; }
+        .ts-kpi .hint  { color: var(--ts-muted); font-size: .85rem; }
 
-        .ts-pill{
+        /* Make KPI links feel clickable + focus */
+        a .ts-kpi { cursor: pointer; }
+        a .ts-kpi:hover { border-color: rgba(99,102,241,.45); }
+        .ts-kpi.green:hover { border-color: rgba(16,185,129,.45); }
+        .ts-kpi.orange:hover{ border-color: rgba(245,158,11,.45); }
+        .ts-kpi.pink:hover  { border-color: rgba(236,72,153,.45); }
+
+        .ts-pill {
             border: 1px solid var(--ts-line);
-            background: rgba(255,255,255,.04);
+            background: rgba(255, 255, 255, .04);
             color: var(--ts-soft);
             border-radius: 999px;
             padding: .35rem .6rem;
             font-size: .85rem;
         }
 
-        .ts-table thead th{
-            color: rgba(255,255,255,.75);
-            font-weight: 600;
+        .ts-table thead th {
+            color: rgba(255, 255, 255, .75);
+            font-weight: 700;
             border-bottom: 1px solid var(--ts-line);
-            background: rgba(255,255,255,.03);
+            background: rgba(255, 255, 255, .03);
         }
-        .ts-table td, .ts-table th{
-            border-color: rgba(255,255,255,.08) !important;
+        .ts-table td, .ts-table th {
+            border-color: rgba(255, 255, 255, .08) !important;
             vertical-align: middle;
+            padding-top: .65rem;
+            padding-bottom: .65rem;
         }
-        .ts-table tbody tr:hover{ background: rgba(255,255,255,.04); }
+        .ts-table tbody tr:nth-child(odd){ background: rgba(255,255,255,.015); }
+        .ts-table tbody tr:hover { background: rgba(255, 255, 255, .04); }
 
-        .ts-badge{
+        .ts-badge {
             font-size: .78rem;
             border-radius: 999px;
             padding: .25rem .55rem;
-            border: 1px solid rgba(255,255,255,.18);
-            background: rgba(255,255,255,.06);
-            color: rgba(255,255,255,.85);
+            border: 1px solid rgba(255, 255, 255, .18);
+            background: rgba(255, 255, 255, .06);
+            color: rgba(255, 255, 255, .85);
         }
 
-        .ts-empty{ padding: 2.2rem 1rem; color: var(--ts-muted); }
-        .ts-foot{ color: rgba(255,255,255,.55); font-size: .85rem; }
-        .ts-logo{ filter: drop-shadow(0 6px 14px rgba(99,102,241,.35)); }
+        .ts-empty { padding: 2.2rem 1rem; color: var(--ts-muted); }
+        .ts-foot  { color: rgba(255, 255, 255, .55); font-size: .85rem; }
+        .ts-logo  { filter: drop-shadow(0 6px 14px rgba(99, 102, 241, .35)); }
 
-        .ts-nav .nav-link{
+        .ts-nav .nav-link {
             border-radius: 999px;
-            border: 1px solid rgba(255,255,255,.12);
-            color: rgba(255,255,255,.75);
+            border: 1px solid rgba(255, 255, 255, .12);
+            color: rgba(255, 255, 255, .75);
             padding: .35rem .75rem;
             font-size: .9rem;
         }
-        .ts-nav .nav-link:hover{
-            background: rgba(255,255,255,.06);
-            color: rgba(255,255,255,.92);
-        }
-        .ts-nav .nav-link.active{
-            background: rgba(99,102,241,.30);
-            border-color: rgba(99,102,241,.45);
+        .ts-nav .nav-link:hover { background: rgba(255, 255, 255, .06); color: rgba(255, 255, 255, .92); }
+        .ts-nav .nav-link.active {
+            background: rgba(99, 102, 241, .30);
+            border-color: rgba(99, 102, 241, .45);
             color: #fff;
         }
 
-        .ts-row-link{ cursor: pointer; }
+        .ts-row-link { cursor: pointer; }
 
         /* Light theme overrides */
-        [data-bs-theme="light"] body{ background: #f6f7fb; color: #0f172a; }
+        [data-bs-theme="light"] body { background: #f6f7fb; color: #0f172a; }
+
         [data-bs-theme="light"] .ts-header,
         [data-bs-theme="light"] .ts-card,
-        [data-bs-theme="light"] .ts-kpi{
+        [data-bs-theme="light"] .ts-kpi {
             background: #fff;
             border-color: rgba(15, 23, 42, .08);
-            box-shadow: 0 16px 35px rgba(15,23,42,.08);
+            box-shadow: 0 16px 35px rgba(15, 23, 42, .08);
         }
+
         [data-bs-theme="light"] .ts-subtitle,
         [data-bs-theme="light"] .ts-kpi .label,
         [data-bs-theme="light"] .ts-kpi .hint,
-        [data-bs-theme="light"] .ts-foot{
-            color: rgba(15,23,42,.6);
+        [data-bs-theme="light"] .ts-foot { color: rgba(15, 23, 42, .6); }
+
+        [data-bs-theme="light"] .ts-table thead th {
+            color: rgba(15, 23, 42, .7);
+            background: rgba(15, 23, 42, .03);
+            border-bottom-color: rgba(15, 23, 42, .08);
         }
-        [data-bs-theme="light"] .ts-table thead th{
-            color: rgba(15,23,42,.7);
-            background: rgba(15,23,42,.03);
-            border-bottom-color: rgba(15,23,42,.08);
+        [data-bs-theme="light"] .ts-table td, [data-bs-theme="light"] .ts-table th { border-color: rgba(15, 23, 42, .07) !important; }
+        [data-bs-theme="light"] .ts-table tbody tr:nth-child(odd){ background: rgba(15,23,42,.015); }
+        [data-bs-theme="light"] .ts-table tbody tr:hover { background: rgba(15, 23, 42, .03); }
+
+        [data-bs-theme="light"] .ts-pill {
+            border-color: rgba(15, 23, 42, .10);
+            background: rgba(15, 23, 42, .03);
+            color: rgba(15, 23, 42, .75);
         }
-        [data-bs-theme="light"] .ts-table td, [data-bs-theme="light"] .ts-table th{
-            border-color: rgba(15,23,42,.07) !important;
+
+        [data-bs-theme="light"] .ts-badge {
+            border-color: rgba(15, 23, 42, .12);
+            background: rgba(15, 23, 42, .03);
+            color: rgba(15, 23, 42, .75);
         }
-        [data-bs-theme="light"] .ts-table tbody tr:hover{ background: rgba(15,23,42,.03); }
-        [data-bs-theme="light"] .ts-pill{
-            border-color: rgba(15,23,42,.10);
-            background: rgba(15,23,42,.03);
-            color: rgba(15,23,42,.75);
-        }
-        [data-bs-theme="light"] .ts-badge{
-            border-color: rgba(15,23,42,.12);
-            background: rgba(15,23,42,.03);
-            color: rgba(15,23,42,.75);
-        }
-        [data-bs-theme="light"] .ts-nav .nav-link{
-            border-color: rgba(15,23,42,.10);
-            color: rgba(15,23,42,.75);
-        }
-        [data-bs-theme="light"] .ts-nav .nav-link:hover{
-            background: rgba(15,23,42,.03);
-            color: rgba(15,23,42,.92);
-        }
-        [data-bs-theme="light"] .ts-nav .nav-link.active{
-            background: rgba(99,102,241,.12);
-            border-color: rgba(99,102,241,.25);
-            color: rgba(15,23,42,.95);
+
+        [data-bs-theme="light"] a .ts-kpi:hover { border-color: rgba(99,102,241,.35); }
+        [data-bs-theme="light"] a .ts-kpi.green:hover { border-color: rgba(16,185,129,.35); }
+        [data-bs-theme="light"] a .ts-kpi.orange:hover{ border-color: rgba(245,158,11,.35); }
+        [data-bs-theme="light"] a .ts-kpi.pink:hover  { border-color: rgba(236,72,153,.35); }
+
+        [data-bs-theme="light"] .ts-nav .nav-link { border-color: rgba(15, 23, 42, .10); color: rgba(15, 23, 42, .75); }
+        [data-bs-theme="light"] .ts-nav .nav-link:hover { background: rgba(15, 23, 42, .03); color: rgba(15, 23, 42, .92); }
+        [data-bs-theme="light"] .ts-nav .nav-link.active {
+            background: rgba(99, 102, 241, .12);
+            border-color: rgba(99, 102, 241, .25);
+            color: rgba(15, 23, 42, .95);
         }
     </style>
 </head>
@@ -257,6 +268,11 @@
                 </span>
 
                 <form method="get" class="d-flex flex-wrap gap-2 align-items-center">
+                    {{-- Keep params stable --}}
+                    <input type="hidden" name="app" value="{{ $qApp }}">
+                    <input type="hidden" name="host" value="{{ $qHost }}">
+                    <input type="hidden" name="range" value="{{ $qRange }}">
+
                     {{-- App filter --}}
                     <select name="app" class="form-select form-select-sm" onchange="this.form.submit()" style="min-width: 170px;">
                         <option value="" @selected(empty($selectedApp))>All apps</option>
@@ -294,106 +310,155 @@
             <ul class="nav nav-pills ts-nav gap-2">
                 <li class="nav-item">
                     <a class="nav-link active"
-                       href="{{ route('traffic-sentinel.dashboard', ['app' => $qApp, 'host' => $qHost, 'range' => $qRange]) }}">
+                       href="{{ route('traffic-sentinel.dashboard', $qs) }}">
                         <i class="bi bi-speedometer2 me-1"></i>Overview
                     </a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link"
-                       href="{{ route('traffic-sentinel.online.humans', ['app' => $qApp, 'host' => $qHost, 'range' => $qRange]) }}">
+                       href="{{ route('traffic-sentinel.online.humans', $qs) }}">
                         <i class="bi bi-activity me-1"></i>Online
                     </a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link"
-                       href="{{ route('traffic-sentinel.unique.humans', ['app' => $qApp, 'host' => $qHost, 'range' => $qRange]) }}">
+                       href="{{ route('traffic-sentinel.unique.humans', $qs) }}">
                         <i class="bi bi-fingerprint me-1"></i>Unique
                     </a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link"
-                       href="{{ route('traffic-sentinel.pageviews.humans', ['app' => $qApp, 'host' => $qHost, 'range' => $qRange]) }}">
+                       href="{{ route('traffic-sentinel.pageviews.humans', $qs) }}">
                         <i class="bi bi-eye me-1"></i>Pageviews
                     </a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link"
-                       href="{{ route('traffic-sentinel.pages', ['app' => $qApp, 'host' => $qHost, 'range' => $qRange]) }}">
+                       href="{{ route('traffic-sentinel.pages', $qs) }}">
                         <i class="bi bi-signpost-2 me-1"></i>Pages
                     </a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link"
-                       href="{{ route('traffic-sentinel.referrers', ['app' => $qApp, 'host' => $qHost, 'range' => $qRange]) }}">
+                       href="{{ route('traffic-sentinel.referrers', $qs) }}">
                         <i class="bi bi-arrow-90deg-left me-1"></i>Referrers
                     </a>
                 </li>
             </ul>
         </div>
+
+        {{-- Active filters chips --}}
+        <div class="mt-3 d-flex flex-wrap gap-2">
+            @if(!empty($qApp))
+                <span class="ts-pill"><i class="bi bi-boxes me-1"></i>{{ $qApp }}</span>
+            @endif
+            @if(!empty($qHost))
+                <span class="ts-pill"><i class="bi bi-globe2 me-1"></i>{{ $qHost }}</span>
+            @endif
+            <span class="ts-pill">
+                <i class="bi bi-calendar3 me-1"></i>{{ $range === 'today' ? 'Today' : "Last $days days" }}
+            </span>
+        </div>
     </div>
 
-    {{-- KPI grid (now 6 cards) --}}
+    {{-- KPI grid (6 cards) --}}
     <div class="row g-3 mb-3">
         <div class="col-12 col-md-6 col-xl-2">
-            <a class="text-decoration-none text-reset d-block"
-               href="{{ route('traffic-sentinel.online.humans', ['app' => $qApp, 'host' => $qHost, 'range' => $qRange]) }}">
+            <a class="text-decoration-none text-reset d-block" href="{{ route('traffic-sentinel.online.humans', $qs) }}">
                 <div class="ts-kpi p-3">
-                    <div class="label">Online Humans</div>
-                    <div class="value">{{ $onlineHumans }}</div>
-                    <div class="hint">Last {{ config('traffic-sentinel.online_minutes', 5) }} min</div>
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="label">Online Humans</div>
+                            <div class="value">{{ $onlineHumans }}</div>
+                            <div class="hint">Last {{ config('traffic-sentinel.online_minutes', 5) }} min</div>
+                        </div>
+                        <span class="ts-badge"><i class="bi bi-person-check me-1"></i>Live</span>
+                    </div>
                 </div>
             </a>
         </div>
 
         <div class="col-12 col-md-6 col-xl-2">
-            <a class="text-decoration-none text-reset d-block"
-               href="{{ route('traffic-sentinel.online.bots', ['app' => $qApp, 'host' => $qHost, 'range' => $qRange]) }}">
+            <a class="text-decoration-none text-reset d-block" href="{{ route('traffic-sentinel.online.bots', $qs) }}">
                 <div class="ts-kpi green p-3">
-                    <div class="label">Online Bots</div>
-                    <div class="value">{{ $onlineBots }}</div>
-                    <div class="hint">Crawlers / tools</div>
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="label">Online Bots</div>
+                            <div class="value">{{ $onlineBots }}</div>
+                            <div class="hint">Crawlers / tools</div>
+                        </div>
+                        <span class="ts-badge"><i class="bi bi-robot me-1"></i>Live</span>
+                    </div>
                 </div>
             </a>
         </div>
 
         <div class="col-12 col-md-6 col-xl-2">
-            <div class="ts-kpi orange p-3">
-                <div class="label">Unique Humans ({{ $range === 'today' ? 'Today' : "Last $days days" }})</div>
-                <div class="value">{{ $data['unique_humans'] ?? 0 }}</div>
-                <div class="hint">Distinct visitor keys</div>
-            </div>
+            <a class="text-decoration-none text-reset d-block" href="{{ route('traffic-sentinel.unique.humans', $qs) }}">
+                <div class="ts-kpi orange p-3">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="label">Unique Humans ({{ $range === 'today' ? 'Today' : "Last $days days" }})</div>
+                            <div class="value">{{ $data['unique_humans'] ?? 0 }}</div>
+                            <div class="hint">Distinct visitor keys</div>
+                        </div>
+                        <span class="ts-badge"><i class="bi bi-fingerprint me-1"></i>Unique</span>
+                    </div>
+                </div>
+            </a>
         </div>
 
         <div class="col-12 col-md-6 col-xl-2">
-            <div class="ts-kpi pink p-3">
-                <div class="label">Unique Bots ({{ $range === 'today' ? 'Today' : "Last $days days" }})</div>
-                <div class="value">{{ $data['unique_bots'] ?? 0 }}</div>
-                <div class="hint">Distinct visitor keys</div>
-            </div>
+            <a class="text-decoration-none text-reset d-block" href="{{ route('traffic-sentinel.unique.bots', $qs) }}">
+                <div class="ts-kpi pink p-3">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="label">Unique Bots ({{ $range === 'today' ? 'Today' : "Last $days days" }})</div>
+                            <div class="value">{{ $data['unique_bots'] ?? 0 }}</div>
+                            <div class="hint">Distinct visitor keys</div>
+                        </div>
+                        <span class="ts-badge"><i class="bi bi-shield-check me-1"></i>Detected</span>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        {{-- IMPORTANT: use your actual route names: traffic-sentinel.unique-ips.* --}}
+        <div class="col-12 col-md-6 col-xl-2">
+            <a class="text-decoration-none text-reset d-block" href="{{ route('traffic-sentinel.unique.ips.humans', $qs) }}">
+                <div class="ts-kpi p-3">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="label">Unique IPs (Humans)</div>
+                            <div class="value">{{ $data['unique_ips_humans'] ?? 0 }}</div>
+                            <div class="hint">{{ $range === 'today' ? 'Today' : "Last $days days" }}</div>
+                        </div>
+                        <span class="ts-badge"><i class="bi bi-geo-alt me-1"></i>IPs</span>
+                    </div>
+                </div>
+            </a>
         </div>
 
         <div class="col-12 col-md-6 col-xl-2">
-            <div class="ts-kpi p-3">
-                <div class="label">Unique IPs (Humans)</div>
-                <div class="value">{{ $data['unique_ips_humans'] ?? 0 }}</div>
-                <div class="hint">{{ $range === 'today' ? 'Today' : "Last $days days" }}</div>
-            </div>
-        </div>
-
-        <div class="col-12 col-md-6 col-xl-2">
-            <div class="ts-kpi green p-3">
-                <div class="label">Unique IPs (Bots)</div>
-                <div class="value">{{ $data['unique_ips_bots'] ?? 0 }}</div>
-                <div class="hint">{{ $range === 'today' ? 'Today' : "Last $days days" }}</div>
-            </div>
+            <a class="text-decoration-none text-reset d-block" href="{{ route('traffic-sentinel.unique.ips.bots', $qs) }}">
+                <div class="ts-kpi green p-3">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="label">Unique IPs (Bots)</div>
+                            <div class="value">{{ $data['unique_ips_bots'] ?? 0 }}</div>
+                            <div class="hint">{{ $range === 'today' ? 'Today' : "Last $days days" }}</div>
+                        </div>
+                        <span class="ts-badge"><i class="bi bi-geo me-1"></i>IPs</span>
+                    </div>
+                </div>
+            </a>
         </div>
     </div>
 
     {{-- Secondary KPIs --}}
     <div class="row g-3 mb-3">
         <div class="col-12 col-lg-6">
-            <a class="text-decoration-none text-reset d-block"
-               href="{{ route('traffic-sentinel.pageviews.humans', ['app' => $qApp, 'host' => $qHost, 'range' => $qRange]) }}">
+            <a class="text-decoration-none text-reset d-block" href="{{ route('traffic-sentinel.pageviews.humans', $qs) }}">
                 <div class="ts-card p-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <div class="fw-semibold"><i class="bi bi-eye me-2"></i>Pageviews (Humans)</div>
@@ -406,8 +471,7 @@
         </div>
 
         <div class="col-12 col-lg-6">
-            <a class="text-decoration-none text-reset d-block"
-               href="{{ route('traffic-sentinel.pageviews.all', ['app' => $qApp, 'host' => $qHost, 'range' => $qRange]) }}">
+            <a class="text-decoration-none text-reset d-block" href="{{ route('traffic-sentinel.pageviews.all', $qs) }}">
                 <div class="ts-card p-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <div class="fw-semibold"><i class="bi bi-collection me-2"></i>Pageviews (All)</div>
@@ -428,13 +492,12 @@
                     <div class="d-flex align-items-center justify-content-between">
                         <div>
                             <a class="text-decoration-none text-reset fw-semibold"
-                               href="{{ route('traffic-sentinel.pages', ['app' => $qApp, 'host' => $qHost, 'range' => $qRange]) }}">
+                               href="{{ route('traffic-sentinel.pages', $qs) }}">
                                 <i class="bi bi-signpost-2 me-2"></i>Top Pages (Humans)
                             </a>
                             <div class="ts-subtitle">Most visited paths by humans</div>
                         </div>
-                        <a class="btn btn-sm btn-outline-secondary"
-                           href="{{ route('traffic-sentinel.pages', ['app' => $qApp, 'host' => $qHost, 'range' => $qRange]) }}">
+                        <a class="btn btn-sm btn-outline-secondary" href="{{ route('traffic-sentinel.pages', $qs) }}">
                             Focus <i class="bi bi-arrow-right ms-1"></i>
                         </a>
                     </div>
@@ -451,12 +514,9 @@
                         <tbody>
                         @forelse(($data['top_pages_humans'] ?? []) as $row)
                             @php
-                                $to = route('traffic-sentinel.pages.path', [
+                                $to = route('traffic-sentinel.pages.path', array_merge($qs, [
                                     'path' => $row['path'],
-                                    'app' => $qApp,
-                                    'host' => $qHost,
-                                    'range' => $qRange,
-                                ]);
+                                ]));
                             @endphp
                             <tr class="ts-row-link" onclick="window.location='{{ $to }}'">
                                 <td class="text-break">
@@ -521,13 +581,12 @@
                     <div class="d-flex align-items-center justify-content-between">
                         <div>
                             <a class="text-decoration-none text-reset fw-semibold"
-                               href="{{ route('traffic-sentinel.referrers', ['app' => $qApp, 'host' => $qHost, 'range' => $qRange]) }}">
+                               href="{{ route('traffic-sentinel.referrers', $qs) }}">
                                 <i class="bi bi-arrow-90deg-left me-2"></i>Top Referrers (Humans)
                             </a>
                             <div class="ts-subtitle">Where people are coming from</div>
                         </div>
-                        <a class="btn btn-sm btn-outline-secondary"
-                           href="{{ route('traffic-sentinel.referrers', ['app' => $qApp, 'host' => $qHost, 'range' => $qRange]) }}">
+                        <a class="btn btn-sm btn-outline-secondary" href="{{ route('traffic-sentinel.referrers', $qs) }}">
                             Focus <i class="bi bi-arrow-right ms-1"></i>
                         </a>
                     </div>
@@ -544,12 +603,9 @@
                         <tbody>
                         @forelse(($data['top_referrers'] ?? []) as $row)
                             @php
-                                $to = route('traffic-sentinel.referrers.show', [
+                                $to = route('traffic-sentinel.referrers.show', array_merge($qs, [
                                     'referrer' => $row['referrer'],
-                                    'app' => $qApp,
-                                    'host' => $qHost,
-                                    'range' => $qRange,
-                                ]);
+                                ]));
                             @endphp
                             <tr class="ts-row-link" onclick="window.location='{{ $to }}'">
                                 <td class="text-break">
@@ -594,13 +650,19 @@
             html.setAttribute('data-bs-theme', 'dark');
         }
 
+        const setIcon = () => {
+            const theme = html.getAttribute('data-bs-theme');
+            const icon = btn?.querySelector('i');
+            if (icon) icon.className = (theme === 'dark') ? 'bi bi-moon-stars' : 'bi bi-sun';
+        };
+
+        setIcon();
+
         btn?.addEventListener('click', function () {
             const next = (html.getAttribute('data-bs-theme') === 'dark') ? 'light' : 'dark';
             html.setAttribute('data-bs-theme', next);
             localStorage.setItem(key, next);
-
-            const icon = btn.querySelector('i');
-            if (icon) icon.className = (next === 'dark') ? 'bi bi-moon-stars' : 'bi bi-sun';
+            setIcon();
         });
     })();
 </script>
