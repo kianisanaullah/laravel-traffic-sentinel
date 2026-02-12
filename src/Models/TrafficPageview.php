@@ -6,7 +6,15 @@ use Illuminate\Database\Eloquent\Model;
 
 class TrafficPageview extends Model
 {
+
     protected $table = 'traffic_pageviews';
+    protected $connection;
+    public function __construct(array $attributes = [])
+    {
+        parent::__construct($attributes);
+
+        $this->connection = config('traffic-sentinel.database.connection', 'mysql');
+    }
 
     protected $guarded = [];
 

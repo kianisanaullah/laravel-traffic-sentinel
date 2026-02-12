@@ -27,14 +27,14 @@ class ExploreController extends Controller
 
     protected function host(Request $request): ?string
     {
-        $host = trim((string) $request->get('host', ''));
+        $host = trim((string)$request->get('host', ''));
         return $host !== '' ? strtolower($host) : null;
     }
 
     public function onlineHumans(Request $request)
     {
         [$range, $days] = $this->range($request);
-        $minutes = (int) config('traffic-sentinel.online_minutes', 5);
+        $minutes = (int)config('traffic-sentinel.online_minutes', 5);
         $host = $this->host($request);
 
         $q = TrafficSession::query()
@@ -58,7 +58,7 @@ class ExploreController extends Controller
     public function onlineBots(Request $request)
     {
         [$range, $days] = $this->range($request);
-        $minutes = (int) config('traffic-sentinel.online_minutes', 5);
+        $minutes = (int)config('traffic-sentinel.online_minutes', 5);
         $host = $this->host($request);
 
         $q = TrafficSession::query()
@@ -86,14 +86,11 @@ class ExploreController extends Controller
 
         $q = TrafficSession::query()
             ->select('visitor_key', 'host')
-
             ->selectRaw('MAX(ip) as ip')
             ->selectRaw('MAX(user_agent) as user_agent')
-
             ->selectRaw('COUNT(*) as sessions')
             ->selectRaw('MIN(first_seen_at) as first_seen_at')
             ->selectRaw('MAX(last_seen_at) as last_seen_at')
-
             ->whereBetween('first_seen_at', [$start, $end])
             ->where('is_bot', false);
 
@@ -106,10 +103,10 @@ class ExploreController extends Controller
 
         return view('traffic-sentinel::explore.unique_humans', [
             'title' => 'Unique Humans',
-            'rows'  => $q->paginate(30)->withQueryString(),
+            'rows' => $q->paginate(30)->withQueryString(),
             'range' => $range,
-            'days'  => $days,
-            'host'  => $host,
+            'days' => $days,
+            'host' => $host,
         ]);
     }
 
@@ -120,14 +117,11 @@ class ExploreController extends Controller
 
         $q = TrafficSession::query()
             ->select('visitor_key', 'bot_name', 'host')
-
             ->selectRaw('MAX(ip) as ip')
             ->selectRaw('MAX(user_agent) as user_agent')
-
             ->selectRaw('COUNT(*) as sessions')
             ->selectRaw('MIN(first_seen_at) as first_seen_at')
             ->selectRaw('MAX(last_seen_at) as last_seen_at')
-
             ->whereBetween('first_seen_at', [$start, $end])
             ->where('is_bot', true);
 
@@ -140,10 +134,10 @@ class ExploreController extends Controller
 
         return view('traffic-sentinel::explore.unique_bots', [
             'title' => 'Unique Bots',
-            'rows'  => $q->paginate(30)->withQueryString(),
+            'rows' => $q->paginate(30)->withQueryString(),
             'range' => $range,
-            'days'  => $days,
-            'host'  => $host,
+            'days' => $days,
+            'host' => $host,
         ]);
     }
 
@@ -167,11 +161,11 @@ class ExploreController extends Controller
             ->whereBetween('viewed_at', [$start, $end])
             ->orderByDesc('viewed_at');
 
-        if (! $includeBots) $q->where('is_bot', false);
+        if (!$includeBots) $q->where('is_bot', false);
         if ($host) $q->where('host', $host);
 
-        if ($path = trim((string) $request->get('path', ''))) {
-            $path = '/'.ltrim($path, '/');
+        if ($path = trim((string)$request->get('path', ''))) {
+            $path = '/' . ltrim($path, '/');
             $q->where('path', $path);
         }
 
@@ -212,7 +206,7 @@ class ExploreController extends Controller
 
     public function pageviewsByPath(Request $request)
     {
-        $path = '/'.ltrim((string) $request->get('path', ''), '/');
+        $path = '/' . ltrim((string)$request->get('path', ''), '/');
         $request->merge(['path' => $path]);
         return $this->pageviews($request, false);
     }
@@ -248,7 +242,7 @@ class ExploreController extends Controller
         [$range, $days, $start, $end] = $this->range($request);
         $host = $this->host($request);
 
-        $ref = (string) $request->get('referrer', '');
+        $ref = (string)$request->get('referrer', '');
 
         $q = TrafficSession::query()
             ->whereBetween('first_seen_at', [$start, $end])
@@ -267,6 +261,7 @@ class ExploreController extends Controller
             'referrer' => Str::limit($ref, 140),
         ]);
     }
+
     public function sessionShow($id)
     {
         $row = TrafficSession::query()
@@ -290,9 +285,10 @@ class ExploreController extends Controller
             'geo' => $geo,
         ]);
     }
+
     public function ipLookup(Request $request, RuntimeIpLookupService $lookup)
     {
-        $ip = trim((string) $request->get('ip', ''));
+        $ip = trim((string)$request->get('ip', ''));
 
         // Basic validation (v4/v6)
         if ($ip === '' || filter_var($ip, FILTER_VALIDATE_IP) === false) {
@@ -307,6 +303,7 @@ class ExploreController extends Controller
             'data' => $data,
         ]);
     }
+
     public function uniqueIpsHumans(Request $request)
     {
         return $this->uniqueIpsIndex($request, false);
@@ -321,18 +318,19 @@ class ExploreController extends Controller
     {
         // range
         $range = $request->get('range', 'today');
-        $days  = $range === '7' ? 7 : ($range === '30' ? 30 : 1);
+        $days = $range === '7' ? 7 : ($range === '30' ? 30 : 1);
 
         [$start, $end] = $this->date_range($days);
 
         // filters
-        $selectedHost = trim((string) $request->get('host', ''));
+        $selectedHost = trim((string)$request->get('host', ''));
         if ($selectedHost === '') $selectedHost = null;
 
-        $selectedApp = trim((string) $request->get('app', ''));
+        $selectedApp = trim((string)$request->get('app', ''));
         if ($selectedApp === '') $selectedApp = null;
 
-        $rows = DB::table('traffic_sessions as s')
+        $rows = DB::connection(config('traffic-sentinel.database.connection', 'mysql'))
+            ->table('traffic_sessions as s')
             ->leftJoin('traffic_pageviews as p', 'p.traffic_session_id', '=', 's.id')
             ->selectRaw('
                 s.host,
@@ -344,24 +342,25 @@ class ExploreController extends Controller
             ')
             ->whereBetween('s.first_seen_at', [$start, $end])
             ->where('s.is_bot', $isBot)
-            ->when($selectedHost, fn ($q) => $q->where('s.host', $selectedHost))
-            ->when($selectedApp, fn ($q) => $q->where('s.app_key', $selectedApp))
+            ->when($selectedHost, fn($q) => $q->where('s.host', $selectedHost))
+            ->when($selectedApp, fn($q) => $q->where('s.app_key', $selectedApp))
             ->groupBy('s.host', DB::raw('COALESCE(s.ip_raw, s.ip)'))
             ->orderByDesc('last_seen_at')
             ->paginate(25)
             ->withQueryString();
 
         return view('traffic-sentinel::explore.unique-ips', [
-            'rows'   => $rows,
-            'isBot'  => $isBot,
-            'range'  => $range,
-            'days'   => $days,
-            'title'  => $isBot ? 'Unique IPs (Bots)' : 'Unique IPs (Humans)',
+            'rows' => $rows,
+            'isBot' => $isBot,
+            'range' => $range,
+            'days' => $days,
+            'title' => $isBot ? 'Unique IPs (Bots)' : 'Unique IPs (Humans)',
         ]);
     }
+
     protected function date_range(int $days): array
     {
-        $end   = Carbon::now();
+        $end = Carbon::now();
         $start = Carbon::now()->subDays($days)->startOfDay();
         return [$start, $end];
     }

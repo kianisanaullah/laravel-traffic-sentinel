@@ -8,7 +8,7 @@ return [
     |--------------------------------------------------------------------------
     */
     'tracking' => [
-        'app_key' => env('TRAFFIC_SENTINEL_APP_KEY', env('APP_NAME','app')),
+        'app_key' => env('TRAFFIC_SENTINEL_APP_KEY', env('APP_NAME', 'app')),
 
         // Track these HTTP methods
         'methods' => ['GET', 'POST'],
@@ -30,8 +30,8 @@ return [
 
         // Ignore file extensions
         'ignore_extensions' => [
-            'css','js','map','jpg','jpeg','png','gif','webp','svg','ico',
-            'woff','woff2','ttf','eot','pdf','zip',
+            'css', 'js', 'map', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'ico',
+            'woff', 'woff2', 'ttf', 'eot', 'pdf', 'zip',
         ],
 
         // If you want to store host in sessions/pageviews
@@ -74,7 +74,7 @@ return [
         */
         'cache' => [
             'enabled' => true,
-            'prefix'  => 'traffic_sentinel:' . env('TRAFFIC_SENTINEL_APP_KEY','app') . ':',
+            'prefix' => 'traffic_sentinel:' . env('TRAFFIC_SENTINEL_APP_KEY', 'app') . ':',
             'ttl_hours' => 12,
         ],
 
@@ -89,7 +89,7 @@ return [
                 'TRAFFIC_SENTINEL_IPDATA_URL',
                 'https://github.com/kianisanaullah/traffic-sentinel-ipdata/releases/latest/download/ipdata.zip'
             ),
-            'timeout' => (int) env('TRAFFIC_SENTINEL_IPDATA_TIMEOUT', 120),
+            'timeout' => (int)env('TRAFFIC_SENTINEL_IPDATA_TIMEOUT', 120),
             'user_agent' => 'TrafficSentinel/1.0 (+https://github.com/kianisanaullah/laravel-traffic-sentinel)',
         ],
     ],
@@ -109,9 +109,9 @@ return [
         'track_bots' => true,
 
         'ua_keywords' => [
-            'bot','crawl','spider','slurp','bingpreview','facebookexternalhit',
-            'headless','lighthouse','pingdom','datadog','uptime','curl','wget',
-            'python-requests','httpclient','go-http-client','scrapy','selenium',
+            'bot', 'crawl', 'spider', 'slurp', 'bingpreview', 'facebookexternalhit',
+            'headless', 'lighthouse', 'pingdom', 'datadog', 'uptime', 'curl', 'wget',
+            'python-requests', 'httpclient', 'go-http-client', 'scrapy', 'selenium',
         ],
     ],
 
@@ -215,5 +215,25 @@ return [
             // hydrate flags inside tables automatically
             'hydrate_flags' => true,
         ],
+    ],
+    /*
+    |--------------------------------------------------------------------------
+    | Database
+    |--------------------------------------------------------------------------
+    */
+    'database' => [
+        /*
+        |--------------------------------------------------------------------------
+        | Connection
+        |--------------------------------------------------------------------------
+        | Database connection to use for traffic tables.
+        | Default: mysql
+        |
+        | Examples:
+        |   mysql
+        |   reporting
+        |   analytics
+        */
+        'connection' => env('TRAFFIC_SENTINEL_DB_CONNECTION', 'mysql'),
     ],
 ];

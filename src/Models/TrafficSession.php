@@ -7,6 +7,13 @@ use Illuminate\Database\Eloquent\Model;
 class TrafficSession extends Model
 {
     protected $table = 'traffic_sessions';
+    protected $connection;
+    public function __construct(array $attributes = [])
+    {
+        parent::__construct($attributes);
+
+        $this->connection = config('traffic-sentinel.database.connection', 'mysql');
+    }
 
     protected $guarded = [];
 

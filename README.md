@@ -93,9 +93,11 @@ composer require kianisanaullah/laravel-traffic-sentinel
 
 ## Publish config & migrations:
 
+```bash
 php artisan vendor:publish --tag=traffic-sentinel-config
 php artisan vendor:publish --tag=traffic-sentinel-migrations
 php artisan migrate
+```
 
 ## 🧩 Middleware
 
@@ -112,10 +114,14 @@ In config/traffic-sentinel.php:
 Option B — Manually register
 
 Add to your web middleware group:
-
+Laravel 11
 ```bash
 \Kianisanaullah\TrafficSentinel\Http\Middleware\TrackTraffic::class,
 ```
+Laravel 12 and above add in bootstrap/app.php
+```bash
+  $middleware->append(\Kianisanaullah\TrafficSentinel\Http\Middleware\TrackTraffic::class);
+  ```
 
 ## 📊 Dashboard
 
@@ -256,6 +262,27 @@ php artisan vendor:publish --tag=traffic-sentinel-config --force
 ```bash
 php artisan traffic:prune --days=30
 ```
+
+🗄️ Database Configuration (Optional)
+
+By default, Traffic Sentinel uses your application’s default database connection (mysql).
+
+You can override this and store all traffic tables in a separate connection (recommended for analytics-heavy apps).
+
+⚙️ Step 1 — Configure Connection
+
+In config/traffic-sentinel.php:
+```bash
+'database' => [
+    'connection' => env('TRAFFIC_SENTINEL_DB_CONNECTION', 'mysql'),
+],
+```
+⚙️ Step 2 — Set in .env (Optional)
+```bash
+TRAFFIC_SENTINEL_DB_CONNECTION=analytics
+```
+Now all Traffic Sentinel queries will use the analytics connection instead of the default one.
+
 
 ## 👤 Who is this for?
 
