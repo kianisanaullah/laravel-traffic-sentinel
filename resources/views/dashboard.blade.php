@@ -34,6 +34,27 @@
 
         // Common query array
         $qs = ['app' => $qApp, 'host' => $qHost, 'range' => $qRange];
+    if (!function_exists('ts_human_number')) {
+        function ts_human_number($n, int $decimals = 1): string {
+            if ($n === null) return '0';
+
+            $n = (float) $n;
+            $abs = abs($n);
+
+            if ($abs >= 1000000000) return rtrim(rtrim(number_format($n/1000000000, $decimals, '.', ''), '0'), '.') . 'B';
+            if ($abs >= 1000000)    return rtrim(rtrim(number_format($n/1000000,    $decimals, '.', ''), '0'), '.') . 'M';
+
+            // For K: if >= 100K show no decimals (e.g. 481K), else 1 decimal (e.g. 98.6K)
+            if ($abs >= 1000) {
+                $k = $n / 1000;
+                $d = ($abs >= 100000) ? 0 : $decimals; // 100,000+ => 0 decimals
+                return rtrim(rtrim(number_format($k, $d, '.', ''), '0'), '.') . 'K';
+            }
+
+            // under 1000 show normal
+            return (string) ((int)$n == $n ? (int)$n : $n);
+        }
+    }
     @endphp
 
     {{-- Favicons --}}
@@ -369,7 +390,7 @@
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
                             <div class="label">Online Humans</div>
-                            <div class="value">{{ $onlineHumans }}</div>
+                            <div class="value">{{ ts_human_number($onlineHumans) }}</div>
                             <div class="hint">Last {{ config('traffic-sentinel.online_minutes', 5) }} min</div>
                         </div>
                         <span class="ts-badge"><i class="bi bi-person-check me-1"></i>Live</span>
@@ -384,7 +405,7 @@
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
                             <div class="label">Online Bots</div>
-                            <div class="value">{{ $onlineBots }}</div>
+                            <div class="value">{{ ts_human_number($onlineBots) }}</div>
                             <div class="hint">Crawlers / tools</div>
                         </div>
                         <span class="ts-badge"><i class="bi bi-robot me-1"></i>Live</span>
@@ -399,7 +420,7 @@
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
                             <div class="label">Unique Humans ({{ $range === 'today' ? 'Today' : "Last $days days" }})</div>
-                            <div class="value">{{ $data['unique_humans'] ?? 0 }}</div>
+                            <div class="value">{{ ts_human_number($data['unique_humans'] ?? 0) }}</div>
                             <div class="hint">Distinct visitor keys</div>
                         </div>
                         <span class="ts-badge"><i class="bi bi-fingerprint me-1"></i>Unique</span>
@@ -414,7 +435,7 @@
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
                             <div class="label">Unique Bots ({{ $range === 'today' ? 'Today' : "Last $days days" }})</div>
-                            <div class="value">{{ $data['unique_bots'] ?? 0 }}</div>
+                            <div class="value">{{ ts_human_number($data['unique_bots'] ?? 0) }}</div>
                             <div class="hint">Distinct visitor keys</div>
                         </div>
                         <span class="ts-badge"><i class="bi bi-shield-check me-1"></i>Detected</span>
@@ -430,7 +451,7 @@
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
                             <div class="label">Unique IPs (Humans)</div>
-                            <div class="value">{{ $data['unique_ips_humans'] ?? 0 }}</div>
+                            <div class="value">{{ ts_human_number($data['unique_ips_humans'] ?? 0) }}</div>
                             <div class="hint">{{ $range === 'today' ? 'Today' : "Last $days days" }}</div>
                         </div>
                         <span class="ts-badge"><i class="bi bi-geo-alt me-1"></i>IPs</span>
@@ -445,7 +466,7 @@
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
                             <div class="label">Unique IPs (Bots)</div>
-                            <div class="value">{{ $data['unique_ips_bots'] ?? 0 }}</div>
+                            <div class="value">{{ ts_human_number($data['unique_ips_bots'] ?? 0) }}</div>
                             <div class="hint">{{ $range === 'today' ? 'Today' : "Last $days days" }}</div>
                         </div>
                         <span class="ts-badge"><i class="bi bi-geo me-1"></i>IPs</span>
