@@ -316,6 +316,24 @@ class ExploreController extends Controller
         $host = $this->host($request);
         $app  = $this->app($request);
 
+        $rawRefHost = "LOWER(
+        CASE
+            WHEN referrer LIKE '%//%' THEN SUBSTRING_INDEX(SUBSTRING_INDEX(referrer, '//', -1), '/', 1)
+            ELSE SUBSTRING_INDEX(referrer, '/', 1)
+        END
+    )";
+
+        $normRefHost = "CASE
+        WHEN LEFT(($rawRefHost), 4) = 'www.' THEN SUBSTRING(($rawRefHost), 5)
+        ELSE ($rawRefHost)
+    END";
+
+        $rawSessHost = "LOWER(COALESCE(host,''))";
+        $normSessHost = "CASE
+        WHEN LEFT(($rawSessHost), 4) = 'www.' THEN SUBSTRING(($rawSessHost), 5)
+        ELSE ($rawSessHost)
+    END";
+
         $q = TrafficSession::query()
             ->select('referrer')
             ->selectRaw('COUNT(*) as hits')
@@ -326,6 +344,8 @@ class ExploreController extends Controller
 
         if ($host) $q->where('host', $host);
         if ($app)  $q->where('app_key', $app);
+        
+        $q->whereRaw("$normRefHost != $normSessHost");
 
         $q->groupBy('referrer')->orderByDesc('hits');
 
