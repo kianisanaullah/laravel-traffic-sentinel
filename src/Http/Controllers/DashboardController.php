@@ -78,6 +78,71 @@ class DashboardController extends Controller
                 'top_bots'           => $rangeStats->topBotsLastDays($days, 10, $selectedHost, $selectedApp),
                 'top_referrers'      => $rangeStats->topReferrersHumansLastDays($days, 10, $selectedHost, $selectedApp),
             ];
+        $end = now();
+        $start = $days === 1 ? now()->startOfDay() : now()->subDays($days)->startOfDay();
+
+        $pvBase = \Kianisanaullah\TrafficSentinel\Models\TrafficPageview::query()
+            ->whereBetween('viewed_at', [$start, $end])
+            ->when($selectedHost, fn($q) => $q->where('host', $selectedHost))
+            ->when($selectedApp, fn($q) => $q->where('app_key', $selectedApp));
+
+        $timeFormat = $days === 1 ? '%H:00' : '%Y-%m-%d';
+
+        $pageviewsSeries = (clone $pvBase)
+            ->selectRaw("DATE_FORMAT(viewed_at, '{$timeFormat}') as t")
+            ->selectRaw("SUM(CASE WHEN is_bot = 0 THEN 1 ELSE 0 END) as humans")
+            ->selectRaw("SUM(CASE WHEN is_bot = 1 THEN 1 ELSE 0 END) as bots")
+            ->groupBy('t')
+            ->orderBy('t')
+            ->get();
+
+        $chartLabels = $pageviewsSeries->pluck('t')->values()->all();
+        $chartHumans = $pageviewsSeries->pluck('humans')->map(fn($v) => (int)$v)->values()->all();
+        $chartBots   = $pageviewsSeries->pluck('bots')->map(fn($v) => (int)$v)->values()->all();
+
+        $directCount = \Kianisanaullah\TrafficSentinel\Models\TrafficSession::query()
+            ->whereBetween('first_seen_at', [$start, $end])
+            ->where('is_bot', false)
+            ->where(function($q){
+                $q->whereNull('referrer')->orWhere('referrer', '');
+            })
+            ->when($selectedHost, fn($q) => $q->where('host', $selectedHost))
+            ->when($selectedApp, fn($q) => $q->where('app_key', $selectedApp))
+            ->count();
+
+        $externalCount = \Kianisanaullah\TrafficSentinel\Models\TrafficSession::query()
+            ->whereBetween('first_seen_at', [$start, $end])
+            ->where('is_bot', false)
+            ->whereNotNull('referrer')
+            ->where('referrer', '!=', '')
+            ->when($selectedHost, fn($q) => $q->where('host', $selectedHost))
+            ->when($selectedApp, fn($q) => $q->where('app_key', $selectedApp))
+            ->count();
+
+        $humansTotal = (int)($data['pageviews_humans'] ?? 0);
+        $botsTotal   = max(0, (int)($data['pageviews_all'] ?? 0) - $humansTotal);
+
+        $chart = [
+            'labels' => $chartLabels,
+            'series' => [
+                'humans' => $chartHumans,
+                'bots'   => $chartBots,
+            ],
+            'mix' => [
+                'humans_pageviews' => $humansTotal,
+                'bots_pageviews'   => $botsTotal,
+                'direct_sessions'  => $directCount,
+                'external_sessions'=> $externalCount,
+            ],
+        ];
+        $recentSessions = \Kianisanaullah\TrafficSentinel\Models\TrafficSession::query()
+            ->whereBetween('first_seen_at', [$start, $end])
+            ->where('is_bot', false)
+            ->when($selectedHost, fn($q) => $q->where('host', $selectedHost))
+            ->when($selectedApp, fn($q) => $q->where('app_key', $selectedApp))
+            ->orderByDesc('first_seen_at')
+            ->limit(12)
+            ->get();
 
         return view('traffic-sentinel::dashboard', [
             'range'        => $range,
@@ -91,7 +156,8 @@ class DashboardController extends Controller
 
             'onlineHumans' => $onlineHumans,
             'onlineBots'   => $onlineBots,
-
+            'chart' => $chart,
+            'recentSessions' => $recentSessions,
             'data'         => $data,
         ]);
     }

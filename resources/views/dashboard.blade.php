@@ -6,6 +6,17 @@
     <title>Traffic Sentinel Dashboard</title>
 
     @php
+        $chartLabels = data_get($chart ?? [], 'labels', []);
+        $chartHumans = data_get($chart ?? [], 'series.humans', []);
+        $chartBots   = data_get($chart ?? [], 'series.bots', []);
+
+        $chartMix = data_get($chart ?? [], 'mix', [
+            'humans_pageviews'   => 0,
+            'bots_pageviews'     => 0,
+            'direct_sessions'    => 0,
+            'external_sessions'  => 0,
+        ]);
+
         $pubIco  = public_path('vendor/traffic-sentinel/favicon.ico');
         $pubPng  = public_path('vendor/traffic-sentinel/favicon.png');
         $pubSvg  = public_path('vendor/traffic-sentinel/favicon.svg');
@@ -408,6 +419,7 @@
             color: rgba(15, 23, 42, .95);
         }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 </head>
 
 <body class="py-4">
@@ -676,6 +688,31 @@
             </a>
         </div>
     </div>
+    <div class="row g-3 mb-3">
+        <div class="col-12 col-xl-8">
+            <div class="ts-card p-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="fw-semibold"><i class="bi bi-graph-up me-2"></i>Pageviews Over Time</div>
+                    <span class="ts-badge">{{ $qRange === 'today' ? 'Hourly' : 'Daily' }}</span>
+                </div>
+                <div style="height: 280px;">
+                    <canvas id="tsChartPageviews"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-xl-4">
+            <div class="ts-card p-3 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="fw-semibold"><i class="bi bi-pie-chart me-2"></i>Traffic Mix</div>
+                    <span class="ts-badge">Range</span>
+                </div>
+                <div style="height: 280px;">
+                    <canvas id="tsChartMix"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
 
     {{-- Tables --}}
     <div class="row g-3">
@@ -854,6 +891,59 @@
             localStorage.setItem(key, next);
             setIcon();
         });
+    })();
+</script>
+<script>
+    (function () {
+        const labels = @json($chartLabels);
+        const humans = @json($chartHumans);
+        const bots   = @json($chartBots);
+        const mix    = @json($chartMix);
+
+        const el1 = document.getElementById('tsChartPageviews');
+        if (el1) {
+            new Chart(el1, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'Humans', data: humans, tension: 0.3 },
+                        { label: 'Bots', data: bots, tension: 0.3 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: { legend: { display: true } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+        }
+
+        const el2 = document.getElementById('tsChartMix');
+        if (el2) {
+            new Chart(el2, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Humans Pageviews', 'Bots Pageviews', 'Direct Sessions', 'External Sessions'],
+                    datasets: [{
+                        data: [
+                            Number(mix.humans_pageviews ?? 0),
+                            Number(mix.bots_pageviews ?? 0),
+                            Number(mix.direct_sessions ?? 0),
+                            Number(mix.external_sessions ?? 0),
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } },
+                    cutout: '65%'
+                }
+            });
+        }
     })();
 </script>
 </body>
