@@ -316,6 +316,8 @@ class ExploreController extends Controller
         $host = $this->host($request);
         $app  = $this->app($request);
 
+        $refType = $request->get('ref_type', 'outside');
+
         $rawRefHost = "LOWER(
         CASE
             WHEN referrer LIKE '%//%' THEN SUBSTRING_INDEX(SUBSTRING_INDEX(referrer, '//', -1), '/', 1)
@@ -334,6 +336,9 @@ class ExploreController extends Controller
         ELSE ($rawSessHost)
     END";
 
+        $baseRef  = "SUBSTRING_INDEX(($normRefHost), '.', -2)";
+        $baseSess = "SUBSTRING_INDEX(($normSessHost), '.', -2)";
+
         $q = TrafficSession::query()
             ->select('referrer')
             ->selectRaw('COUNT(*) as hits')
@@ -344,8 +349,15 @@ class ExploreController extends Controller
 
         if ($host) $q->where('host', $host);
         if ($app)  $q->where('app_key', $app);
-        
-        $q->whereRaw("$normRefHost != $normSessHost");
+
+        if ($refType === 'internal') {
+            $q->whereRaw("$normRefHost = $normSessHost");
+        } elseif ($refType === 'domain') {
+            $q->whereRaw("$baseRef = $baseSess")
+                ->whereRaw("$normRefHost != $normSessHost");
+        } elseif ($refType === 'outside') {
+            $q->whereRaw("$baseRef != $baseSess");
+        }
 
         $q->groupBy('referrer')->orderByDesc('hits');
 
@@ -360,6 +372,7 @@ class ExploreController extends Controller
             'selectedApp'  => $app,
             'hosts'        => $hosts,
             'apps'         => $apps,
+            'refType'      => $refType,
         ]);
     }
 
