@@ -10,6 +10,7 @@ use Illuminate\Support\Str;
 use Kianisanaullah\TrafficSentinel\Models\TrafficPageview;
 use Kianisanaullah\TrafficSentinel\Models\TrafficSession;
 use Kianisanaullah\TrafficSentinel\Services\RuntimeIpLookupService;
+use Illuminate\Support\Facades\Schema;
 
 class ExploreController extends Controller
 {
