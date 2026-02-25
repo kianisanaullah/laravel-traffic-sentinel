@@ -11,9 +11,30 @@
         TS.routes.ipLookup = @json(config('traffic-sentinel.ui.ip_modal.endpoint', '/admin/traffic-sentinel/ip/lookup?ip=__IP__'));
 
         const modalEl = document.getElementById('tsIpModal');
-        if (!modalEl || !window.bootstrap) return;
+        if (!modalEl) return;
 
-        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        const hasBs5 = !!(window.bootstrap && window.bootstrap.Modal);
+
+        const bs5Modal = hasBs5 ? window.bootstrap.Modal.getOrCreateInstance(modalEl) : null;
+
+        function showModal() {
+            if (hasBs5 && bs5Modal) {
+                bs5Modal.show();
+                return true;
+            }
+
+            // Bootstrap 4 fallback (jQuery)
+            if (window.jQuery && window.jQuery.fn && window.jQuery.fn.modal) {
+                window.jQuery(modalEl).modal('show');
+                return true;
+            }
+
+            // No modal JS available
+            console.warn('[TrafficSentinel] No Bootstrap modal API found (need BS5 bootstrap.Modal or BS4 jQuery modal).');
+            return false;
+        }
+
+        // const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
 
         const $loading = document.getElementById('tsIpModalLoading');
         const $body    = document.getElementById('tsIpModalBody');
@@ -103,7 +124,7 @@
             $openIp.href = 'https://ipinfo.io/' + encodeURIComponent(ipVal);
 
             setState({loading:true, error:null});
-            modal.show();
+            showModal();
 
             try{
                 const d = await fetchIp(ipVal);
@@ -154,21 +175,28 @@
             $copyOk.classList.remove('d-none');
             setTimeout(()=> $copyOk.classList.add('d-none'), 1400);
         });
-
-        // Flag hydration (inline flags in tables)
-        TS.hydrateIpFlags = async function(scope=document){
+        TS.hydrateIpFlags = async function(scope = document){
             const hydrateEnabled = @json((bool) config('traffic-sentinel.ui.ip_modal.hydrate_flags', true));
             if (!hydrateEnabled) return;
 
+            // Find all flag elements
             const els = scope.querySelectorAll('[data-ts-flag]');
-            const ips = [...new Set([...els].map(el => el.getAttribute('data-ts-flag')).filter(Boolean))];
+
+            // ✅ Skip elements inside disabled containers
+            const filtered = [...els].filter(el =>
+                !el.closest('[data-ts-hydrate-flags="0"]')
+            );
+
+            const ips = [...new Set(
+                filtered.map(el => el.getAttribute('data-ts-flag')).filter(Boolean)
+            )];
 
             for (const ip of ips) {
                 if (TS.ipCache[ip]) continue;
                 try { await fetchIp(ip); } catch(e) {}
             }
 
-            els.forEach(el => {
+            filtered.forEach(el => {
                 const ip = el.getAttribute('data-ts-flag');
                 const d = TS.ipCache[ip];
                 if (d && d.flag) el.textContent = d.flag;

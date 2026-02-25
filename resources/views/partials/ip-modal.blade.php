@@ -17,7 +17,11 @@
                     </div>
                 </div>
 
-                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal" aria-label="Close">
+                <button type="button"
+                        class="btn btn-sm btn-outline-secondary"
+                        data-bs-dismiss="modal"
+                        data-dismiss="modal"
+                        aria-label="Close">
                     <i class="bi bi-x-lg"></i>
                 </button>
             </div>
