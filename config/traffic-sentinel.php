@@ -2,6 +2,12 @@
 
 return [
 
+    'enabled' => env('TRAFFIC_SENTINEL_ENABLED', false),
+
+    'track_ajax' => false,
+    'track_livewire' => false,
+    'track_redirects' => false,
+    'track_errors' => false,
     /*
     |--------------------------------------------------------------------------
     | Tracking
@@ -235,5 +241,19 @@ return [
         |   analytics
         */
         'connection' => env('TRAFFIC_SENTINEL_DB_CONNECTION', 'mysql'),
+    ],
+    'partitioning' => [
+        'enabled' => true,
+
+        // how many past months to create partitions for
+        'months_past' => 12,
+
+        // how many future months to create partitions for
+        'months_future' => 3,
+    ],
+
+    'prune' => [
+        // keep last N days of raw data (0 = disabled)
+        'keep_days' => 120,
     ],
 ];
