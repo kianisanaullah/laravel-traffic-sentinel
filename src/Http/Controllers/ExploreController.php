@@ -7,10 +7,12 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Kianisanaullah\TrafficSentinel\Models\TrafficPageview;
-use Kianisanaullah\TrafficSentinel\Models\TrafficSession;
 use Kianisanaullah\TrafficSentinel\Services\RuntimeIpLookupService;
-use Illuminate\Support\Facades\Schema;
+
+use Kianisanaullah\TrafficSentinel\Models\TrafficPageviewHuman;
+use Kianisanaullah\TrafficSentinel\Models\TrafficPageviewBot;
+use Kianisanaullah\TrafficSentinel\Models\TrafficSessionHuman;
+use Kianisanaullah\TrafficSentinel\Models\TrafficSessionBot;
 
 class ExploreController extends Controller
 {
@@ -44,26 +46,51 @@ class ExploreController extends Controller
     }
 
     /**
-     * Dropdown data for header filters
-     * (kept simple, no service, no caching)
+     * Return correct model/table based on bot/human.
+     */
+    protected function sessModel(bool $isBot): string
+    {
+        return $isBot ? TrafficSessionBot::class : TrafficSessionHuman::class;
+    }
+
+    protected function pvModel(bool $includeBots): array
+    {
+        // returns [humansModel, botsModel|null]
+        return $includeBots
+            ? [TrafficPageviewHuman::class, TrafficPageviewBot::class]
+            : [TrafficPageviewHuman::class, null];
+    }
+
+    /**
+     * Dropdown data for header filters (fast: read sessions humans+bots union)
      */
     protected function filterLists(): array
     {
-        $hosts = TrafficSession::query()
-            ->whereNotNull('host')
-            ->where('host', '!=', '')
-            ->select('host')
-            ->distinct()
+        // Hosts
+        $hostsHum = TrafficSessionHuman::query()
+            ->whereNotNull('host')->where('host', '!=', '')
+            ->select('host')->distinct();
+
+        $hostsBot = TrafficSessionBot::query()
+            ->whereNotNull('host')->where('host', '!=', '')
+            ->select('host')->distinct();
+
+        $hosts = $hostsHum->union($hostsBot)
             ->orderBy('host')
             ->pluck('host')
             ->values()
             ->all();
 
-        $apps = TrafficSession::query()
-            ->whereNotNull('app_key')
-            ->where('app_key', '!=', '')
-            ->select('app_key')
-            ->distinct()
+        // Apps
+        $appsHum = TrafficSessionHuman::query()
+            ->whereNotNull('app_key')->where('app_key', '!=', '')
+            ->select('app_key')->distinct();
+
+        $appsBot = TrafficSessionBot::query()
+            ->whereNotNull('app_key')->where('app_key', '!=', '')
+            ->select('app_key')->distinct();
+
+        $apps = $appsHum->union($appsBot)
             ->orderBy('app_key')
             ->pluck('app_key')
             ->values()
@@ -80,9 +107,8 @@ class ExploreController extends Controller
         $host    = $this->host($request);
         $app     = $this->app($request);
 
-        $q = TrafficSession::query()
+        $q = TrafficSessionHuman::query()
             ->where('last_seen_at', '>=', now()->subMinutes($minutes))
-            ->where('is_bot', false)
             ->orderByDesc('last_seen_at');
 
         if ($host) $q->where('host', $host);
@@ -112,9 +138,8 @@ class ExploreController extends Controller
         $host    = $this->host($request);
         $app     = $this->app($request);
 
-        $q = TrafficSession::query()
+        $q = TrafficSessionBot::query()
             ->where('last_seen_at', '>=', now()->subMinutes($minutes))
-            ->where('is_bot', true)
             ->orderByDesc('last_seen_at');
 
         if ($host) $q->where('host', $host);
@@ -142,7 +167,7 @@ class ExploreController extends Controller
         $host = $this->host($request);
         $app  = $this->app($request);
 
-        $q = TrafficSession::query()
+        $q = TrafficSessionHuman::query()
             ->select('visitor_key', 'host')
             ->selectRaw('MAX(ip) as ip')
             ->selectRaw('MAX(ip_raw) as ip_raw')
@@ -150,8 +175,7 @@ class ExploreController extends Controller
             ->selectRaw('COUNT(*) as sessions')
             ->selectRaw('MIN(first_seen_at) as first_seen_at')
             ->selectRaw('MAX(last_seen_at) as last_seen_at')
-            ->whereBetween('first_seen_at', [$start, $end])
-            ->where('is_bot', false);
+            ->whereBetween('first_seen_at', [$start, $end]);
 
         if ($host) $q->where('host', $host);
         if ($app)  $q->where('app_key', $app);
@@ -179,7 +203,7 @@ class ExploreController extends Controller
         $host = $this->host($request);
         $app  = $this->app($request);
 
-        $q = TrafficSession::query()
+        $q = TrafficSessionBot::query()
             ->select('visitor_key', 'bot_name', 'host')
             ->selectRaw('MAX(ip) as ip')
             ->selectRaw('MAX(ip_raw) as ip_raw')
@@ -187,8 +211,7 @@ class ExploreController extends Controller
             ->selectRaw('COUNT(*) as sessions')
             ->selectRaw('MIN(first_seen_at) as first_seen_at')
             ->selectRaw('MAX(last_seen_at) as last_seen_at')
-            ->whereBetween('first_seen_at', [$start, $end])
-            ->where('is_bot', true);
+            ->whereBetween('first_seen_at', [$start, $end]);
 
         if ($host) $q->where('host', $host);
         if ($app)  $q->where('app_key', $app);
@@ -226,26 +249,35 @@ class ExploreController extends Controller
         $host = $this->host($request);
         $app  = $this->app($request);
 
-        $q = TrafficPageview::query()
-            ->with('session')
-            ->whereBetween('viewed_at', [$start, $end])
-            ->orderByDesc('viewed_at');
+        [$humansModel, $botsModel] = $this->pvModel($includeBots);
 
-        if (! $includeBots) $q->where('is_bot', false);
-        if ($host) $q->where('host', $host);
+        $hq = $humansModel::query()
+            ->whereBetween('viewed_at', [$start, $end]);
 
-        // app filter: prefer direct column if exists, otherwise fallback to session relation
-        if ($app) {
-            if (Schema::hasColumn((new TrafficPageview)->getTable(), 'app_key')) {
-                $q->where('app_key', $app);
-            } else {
-                $q->whereHas('session', fn ($sq) => $sq->where('app_key', $app));
-            }
-        }
+        if ($host) $hq->where('host', $host);
+        if ($app)  $hq->where('app_key', $app);
 
         if ($path = trim((string) $request->get('path', ''))) {
             $path = '/' . ltrim($path, '/');
-            $q->where('path', $path);
+            $hq->where('path', $path);
+        }
+
+        if (! $includeBots) {
+            $q = $hq->orderByDesc('viewed_at');
+        } else {
+            $bq = $botsModel::query()
+                ->whereBetween('viewed_at', [$start, $end]);
+
+            if ($host) $bq->where('host', $host);
+            if ($app)  $bq->where('app_key', $app);
+
+            if ($path = trim((string) $request->get('path', ''))) {
+                $path = '/' . ltrim($path, '/');
+                $bq->where('path', $path);
+            }
+
+            // UNION humans + bots into one list
+            $q = $hq->select('*')->unionAll($bq->select('*'))->orderByDesc('viewed_at');
         }
 
         [$hosts, $apps] = $this->filterLists();
@@ -270,21 +302,13 @@ class ExploreController extends Controller
         $host = $this->host($request);
         $app  = $this->app($request);
 
-        $q = TrafficPageview::query()
+        $q = TrafficPageviewHuman::query()
             ->select('path')
             ->selectRaw('COUNT(*) as hits')
-            ->whereBetween('viewed_at', [$start, $end])
-            ->where('is_bot', false);
+            ->whereBetween('viewed_at', [$start, $end]);
 
         if ($host) $q->where('host', $host);
-
-        if ($app) {
-            if (Schema::hasColumn((new TrafficPageview)->getTable(), 'app_key')) {
-                $q->where('app_key', $app);
-            } else {
-                $q->whereHas('session', fn ($sq) => $sq->where('app_key', $app));
-            }
-        }
+        if ($app)  $q->where('app_key', $app);
 
         $q->groupBy('path')->orderByDesc('hits');
 
@@ -319,31 +343,30 @@ class ExploreController extends Controller
         $refType = $request->get('ref_type', 'outside');
 
         $rawRefHost = "LOWER(
-        CASE
-            WHEN referrer LIKE '%//%' THEN SUBSTRING_INDEX(SUBSTRING_INDEX(referrer, '//', -1), '/', 1)
-            ELSE SUBSTRING_INDEX(referrer, '/', 1)
-        END
-    )";
+            CASE
+                WHEN referrer LIKE '%//%' THEN SUBSTRING_INDEX(SUBSTRING_INDEX(referrer, '//', -1), '/', 1)
+                ELSE SUBSTRING_INDEX(referrer, '/', 1)
+            END
+        )";
 
         $normRefHost = "CASE
-        WHEN LEFT(($rawRefHost), 4) = 'www.' THEN SUBSTRING(($rawRefHost), 5)
-        ELSE ($rawRefHost)
-    END";
+            WHEN LEFT(($rawRefHost), 4) = 'www.' THEN SUBSTRING(($rawRefHost), 5)
+            ELSE ($rawRefHost)
+        END";
 
         $rawSessHost = "LOWER(COALESCE(host,''))";
         $normSessHost = "CASE
-        WHEN LEFT(($rawSessHost), 4) = 'www.' THEN SUBSTRING(($rawSessHost), 5)
-        ELSE ($rawSessHost)
-    END";
+            WHEN LEFT(($rawSessHost), 4) = 'www.' THEN SUBSTRING(($rawSessHost), 5)
+            ELSE ($rawSessHost)
+        END";
 
         $baseRef  = "SUBSTRING_INDEX(($normRefHost), '.', -2)";
         $baseSess = "SUBSTRING_INDEX(($normSessHost), '.', -2)";
 
-        $q = TrafficSession::query()
+        $q = TrafficSessionHuman::query()
             ->select('referrer')
             ->selectRaw('COUNT(*) as hits')
             ->whereBetween('first_seen_at', [$start, $end])
-            ->where('is_bot', false)
             ->whereNotNull('referrer')
             ->where('referrer', '!=', '');
 
@@ -384,9 +407,8 @@ class ExploreController extends Controller
 
         $ref = (string) $request->get('referrer', '');
 
-        $q = TrafficSession::query()
+        $q = TrafficSessionHuman::query()
             ->whereBetween('first_seen_at', [$start, $end])
-            ->where('is_bot', false)
             ->where('referrer', $ref)
             ->orderByDesc('first_seen_at');
 
@@ -410,9 +432,32 @@ class ExploreController extends Controller
 
     public function sessionShow($id)
     {
-        $row = TrafficSession::query()
-            ->with(['pageviews' => fn ($q) => $q->latest('viewed_at')->limit(50)])
-            ->findOrFail($id);
+        // humans + bots lookup (humans first)
+        $row = TrafficSessionHuman::find($id);
+        $isBot = false;
+
+        if (! $row) {
+            $row = TrafficSessionBot::findOrFail($id);
+            $isBot = true;
+        }
+
+        // Load last 50 pageviews for this session from proper table
+        if ($isBot) {
+            $pageviews = TrafficPageviewBot::query()
+                ->where('traffic_session_id', $row->id)
+                ->latest('viewed_at')
+                ->limit(50)
+                ->get();
+        } else {
+            $pageviews = TrafficPageviewHuman::query()
+                ->where('traffic_session_id', $row->id)
+                ->latest('viewed_at')
+                ->limit(50)
+                ->get();
+        }
+
+        // attach dynamic relation-like property used in blade (if any)
+        $row->setRelation('pageviews', $pageviews);
 
         $geo = null;
 
@@ -424,7 +469,6 @@ class ExploreController extends Controller
             $geo = null;
         }
 
-        // keep filters in header
         [$hosts, $apps] = $this->filterLists();
 
         return view('traffic-sentinel::explore.session_show', [
@@ -474,12 +518,14 @@ class ExploreController extends Controller
         $selectedHost = $this->host($request);
         $selectedApp  = $this->app($request);
 
-        // use configured connection (future-proof)
         $conn = config('traffic-sentinel.database.connection', config('database.default', 'mysql'));
 
+        $sessTable = $isBot ? 'traffic_sessions_bots' : 'traffic_sessions_humans';
+        $pvTable   = $isBot ? 'traffic_pageviews_bots' : 'traffic_pageviews_humans';
+
         $rows = DB::connection($conn)
-            ->table('traffic_sessions as s')
-            ->leftJoin('traffic_pageviews as p', 'p.traffic_session_id', '=', 's.id')
+            ->table($sessTable . ' as s')
+            ->leftJoin($pvTable . ' as p', 'p.traffic_session_id', '=', 's.id')
             ->selectRaw('
                 s.host,
                 COALESCE(s.ip_raw, s.ip) as ip,
@@ -489,7 +535,6 @@ class ExploreController extends Controller
                 MAX(s.last_seen_at) as last_seen_at
             ')
             ->whereBetween('s.first_seen_at', [$start, $end])
-            ->where('s.is_bot', $isBot)
             ->when($selectedHost, fn ($q) => $q->where('s.host', $selectedHost))
             ->when($selectedApp, fn ($q) => $q->where('s.app_key', $selectedApp))
             ->groupBy('s.host', DB::raw('COALESCE(s.ip_raw, s.ip)'))

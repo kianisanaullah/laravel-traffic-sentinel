@@ -8,6 +8,10 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Kianisanaullah\TrafficSentinel\Models\TrafficPageview;
 use Kianisanaullah\TrafficSentinel\Models\TrafficSession;
+use Kianisanaullah\TrafficSentinel\Models\TrafficPageviewBot;
+use Kianisanaullah\TrafficSentinel\Models\TrafficPageviewHuman;
+use Kianisanaullah\TrafficSentinel\Models\TrafficSessionBot;
+use Kianisanaullah\TrafficSentinel\Models\TrafficSessionHuman;
 
 class TrafficTracker
 {
@@ -42,6 +46,78 @@ class TrafficTracker
 
         $userId = auth()->check() ? (int) auth()->id() : null;
 
+//        DB::transaction(function () use (
+//            $sessionId,
+//            $visitorKey,
+//            $ipStored,
+//            $ua,
+//            $deviceType,
+//            $ref,
+//            $fullUrl,
+//            $path,
+//            $routeName,
+//            $now,
+//            $userId,
+//            $durationMs,
+//            $statusCode,
+//            $request,
+//            $isBot,
+//            $botName,
+//            $host,
+//            $appKey
+//        ) {
+//            /** @var TrafficSession|null $session */
+//            $session = TrafficSession::query()
+//                ->where('session_id', $sessionId)
+//                ->first();
+//
+//            if (! $session) {
+//                $session = TrafficSession::create([
+//                    'session_id'    => $sessionId,
+//                    'visitor_key'   => $visitorKey,
+//                    'host'          => $host,
+//                    'ip'            => $ipStored,
+//                    'user_agent'    => Str::limit($ua, 500, ''),
+//                    'device_type'   => $deviceType,
+//                    'referrer'      => Str::limit($ref ?: null, 500, ''),
+//                    'landing_url'   => Str::limit($fullUrl ?: null, 500, ''),
+//                    'first_seen_at' => $now,
+//                    'last_seen_at'  => $now,
+//                    'user_id'       => $userId,
+//                    'is_bot'        => $isBot,
+//                    'bot_name'      => $botName,
+//                    'app_key'       => $appKey,
+//                ]);
+//            } else {
+//                $session->update([
+//                    'last_seen_at' => $now,
+//                    'user_id'      => $userId ?? $session->user_id,
+//                    'is_bot'       => $session->is_bot || $isBot,
+//                    'bot_name'     => $session->bot_name ?: $botName,
+//
+//
+//                    'host'         => $session->host ?: $host,
+//                    'app_key'      => $session->app_key ?: $appKey,
+//                ]);
+//            }
+//
+//            TrafficPageview::create([
+//                'traffic_session_id' => $session->id,
+//                'host'               => $host,
+//                'method'             => $request->method(),
+//                'path'               => Str::limit($path, 500, ''),
+//                'full_url'           => Str::limit($fullUrl, 800, ''),
+//                'route_name'          => $routeName,
+//                'status_code'         => $statusCode ? (string) $statusCode : null,
+//                'duration_ms'         => $durationMs,
+//                'viewed_at'           => $now,
+//                'is_bot'              => $isBot,
+//                'bot_name'            => $botName,
+//                'app_key'            => $appKey,
+//            ]);
+//        });
+
+
         DB::transaction(function () use (
             $sessionId,
             $visitorKey,
@@ -62,56 +138,94 @@ class TrafficTracker
             $host,
             $appKey
         ) {
-            /** @var TrafficSession|null $session */
-            $session = TrafficSession::query()
-                ->where('session_id', $sessionId)
-                ->first();
+            $commonSession = [
+                'session_id'    => $sessionId,
+                'visitor_key'   => $visitorKey,
+                'host'          => $host,
+                'ip'            => $ipStored,
+                'user_agent'    => Str::limit($ua, 500, ''),
+                'device_type'   => $deviceType,
+                'referrer'      => Str::limit($ref ?: null, 500, ''),
+                'landing_url'   => Str::limit($fullUrl ?: null, 500, ''),
+                'first_seen_at' => $now,
+                'last_seen_at'  => $now,
+                'user_id'       => $userId,
+                'app_key'       => $appKey,
+            ];
 
-            if (! $session) {
-                $session = TrafficSession::create([
-                    'session_id'    => $sessionId,
-                    'visitor_key'   => $visitorKey,
-                    'host'          => $host,
-                    'ip'            => $ipStored,
-                    'user_agent'    => Str::limit($ua, 500, ''),
-                    'device_type'   => $deviceType,
-                    'referrer'      => Str::limit($ref ?: null, 500, ''),
-                    'landing_url'   => Str::limit($fullUrl ?: null, 500, ''),
-                    'first_seen_at' => $now,
-                    'last_seen_at'  => $now,
-                    'user_id'       => $userId,
-                    'is_bot'        => $isBot,
-                    'bot_name'      => $botName,
-                    'app_key'       => $appKey,
-                ]);
-            } else {
-                $session->update([
+            $commonPageview = [
+                'host'        => $host,
+                'method'      => $request->method(),
+                'path'        => Str::limit($path, 500, ''),
+                'full_url'    => Str::limit($fullUrl, 800, ''),
+                'route_name'  => $routeName,
+                'status_code' => $statusCode ? (string) $statusCode : null,
+                'duration_ms' => $durationMs,
+                'viewed_at'   => $now,
+                'app_key'     => $appKey,
+                'user_id'     => $userId,
+                'ip'          => $ipStored,
+                'session_id'  => $sessionId,
+                'visitor_key' => $visitorKey,
+            ];
+
+            if ($isBot) {
+                /** @var TrafficSessionBot $session */
+                $session = TrafficSessionBot::query()->firstOrCreate(
+                    ['session_id' => $sessionId],
+                    $commonSession + ['bot_name' => $botName]
+                );
+
+                $update = [
                     'last_seen_at' => $now,
-                    'user_id'      => $userId ?? $session->user_id,
-                    'is_bot'       => $session->is_bot || $isBot,
-                    'bot_name'     => $session->bot_name ?: $botName,
-
-
                     'host'         => $session->host ?: $host,
                     'app_key'      => $session->app_key ?: $appKey,
-                ]);
+                    'bot_name'     => $session->bot_name ?: $botName,
+                ];
+                if ($userId && !$session->user_id) {
+                    $update['user_id'] = $userId;
+                }
+                if ($ipStored && !$session->ip) {
+                    $update['ip'] = $ipStored;
+                }
+
+                $session->update($update);
+
+                TrafficPageviewBot::create($commonPageview + [
+                        'traffic_session_id' => $session->id,
+                        'bot_name'           => $botName,
+                    ]);
+
+                return;
             }
 
-            TrafficPageview::create([
-                'traffic_session_id' => $session->id,
-                'host'               => $host,
-                'method'             => $request->method(),
-                'path'               => Str::limit($path, 500, ''),
-                'full_url'           => Str::limit($fullUrl, 800, ''),
-                'route_name'          => $routeName,
-                'status_code'         => $statusCode ? (string) $statusCode : null,
-                'duration_ms'         => $durationMs,
-                'viewed_at'           => $now,
-                'is_bot'              => $isBot,
-                'bot_name'            => $botName,
-                'app_key'            => $appKey,
-            ]);
+            /** @var TrafficSessionHuman $session */
+            $session = TrafficSessionHuman::query()->firstOrCreate(
+                ['session_id' => $sessionId],
+                $commonSession
+            );
+
+            $update = [
+                'last_seen_at' => $now,
+                'host'         => $session->host ?: $host,
+                'app_key'      => $session->app_key ?: $appKey,
+            ];
+
+            if ($userId && !$session->user_id) {
+                $update['user_id'] = $userId;
+            }
+
+            if ($ipStored && !$session->ip) {
+                $update['ip'] = $ipStored;
+            }
+
+            $session->update($update);
+
+            TrafficPageviewHuman::create($commonPageview + [
+                    'traffic_session_id' => $session->id,
+                ]);
         });
+
     }
 
     protected function shouldTrackBasic(Request $request): bool

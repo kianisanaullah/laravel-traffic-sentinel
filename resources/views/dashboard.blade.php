@@ -44,10 +44,11 @@
         $qApp   = request('app', $selectedApp ?? '');
 
         // Common query array (always safe to pass)
-        $qs = ['app' => $qApp, 'host' => $qHost, 'range' => $qRange];
+        $qMode = request('mode', $mode ?? 'humans');
+        $qs = ['app' => $qApp, 'host' => $qHost, 'range' => $qRange, 'mode' => $qMode];
 
         // Keep any other params (path/referrer/etc) when changing filters (not used here but safe)
-        $sticky = request()->except(['host','app','range','page']);
+       $sticky = request()->except(['host','app','range','mode','page']);
 
         if (!function_exists('ts_human_number')) {
             function ts_human_number($n, int $decimals = 1): string {
@@ -75,6 +76,15 @@
         // Optional: if you later rename to traffic-sentinel.unique.ips.* keep compatibility
         if (\Illuminate\Support\Facades\Route::has('traffic-sentinel.unique.ips.humans')) $rUniqueIpsHumans = 'traffic-sentinel.unique.ips.humans';
         if (\Illuminate\Support\Facades\Route::has('traffic-sentinel.unique.ips.bots'))   $rUniqueIpsBots   = 'traffic-sentinel.unique.ips.bots';
+
+        $rIpLogsHumans = 'traffic-sentinel.ip-logs.humans';
+        $rIpLogsBots   = 'traffic-sentinel.ip-logs.bots';
+
+          // optional backward compatibility
+          if (\Illuminate\Support\Facades\Route::has('traffic-sentinel.ip.logs.humans')) $rIpLogsHumans = 'traffic-sentinel.ip.logs.humans';
+          if (\Illuminate\Support\Facades\Route::has('traffic-sentinel.ip.logs.bots'))   $rIpLogsBots   = 'traffic-sentinel.ip.logs.bots';
+
+
     @endphp
 
     {{-- Favicons --}}
@@ -458,6 +468,14 @@
 
                 <form method="get" class="d-flex flex-wrap gap-2 align-items-center">
 
+                    {{-- Mode filter (default: humans only for speed) --}}
+                    <select name="mode" class="form-select form-select-sm" onchange="this.form.submit()">
+                        <option value="humans" @selected(($mode ?? 'humans') === 'humans')>Humans only</option>
+                        <option value="bots" @selected(($mode ?? 'humans') === 'bots')>Bots only</option>
+                        <option value="both" @selected(($mode ?? 'humans') === 'both')>Humans + Bots</option>
+                    </select>
+
+
                     {{-- Preserve any other query params (path/referrer/etc) --}}
                     @foreach($sticky as $k => $v)
                         @if(is_array($v))
@@ -561,37 +579,40 @@
 
     {{-- KPI grid --}}
     <div class="row g-3 mb-3">
-        <div class="col-12 col-md-6 col-xl-2">
-            <a class="text-decoration-none text-reset ts-kpi-link"
-               href="{{ route('traffic-sentinel.online.humans', $qs) }}">
-                <div class="ts-kpi p-3">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <div class="label">Online Humans</div>
-                            <div class="value">{{ ts_human_number($onlineHumans) }}</div>
-                            <div class="hint">Last {{ config('traffic-sentinel.online_minutes', 5) }} min</div>
+        @if(!empty($includeHumans))
+            <div class="col-12 col-md-6 col-xl-2">
+                <a class="text-decoration-none text-reset ts-kpi-link"
+                   href="{{ route('traffic-sentinel.online.humans', $qs) }}">
+                    <div class="ts-kpi p-3">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="label">Online Humans</div>
+                                <div class="value">{{ ts_human_number($onlineHumans) }}</div>
+                                <div class="hint">Last {{ config('traffic-sentinel.online_minutes', 5) }} min</div>
+                            </div>
+                            <span class="ts-badge"><i class="bi bi-person-check me-1"></i>Live</span>
                         </div>
-                        <span class="ts-badge"><i class="bi bi-person-check me-1"></i>Live</span>
                     </div>
-                </div>
-            </a>
-        </div>
-
-        <div class="col-12 col-md-6 col-xl-2">
-            <a class="text-decoration-none text-reset ts-kpi-link"
-               href="{{ route('traffic-sentinel.online.bots', $qs) }}">
-                <div class="ts-kpi green p-3">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <div class="label">Online Bots</div>
-                            <div class="value">{{ ts_human_number($onlineBots) }}</div>
-                            <div class="hint">Crawlers / tools</div>
+                </a>
+            </div>
+        @endif
+        @if(!empty($includeBots))
+            <div class="col-12 col-md-6 col-xl-2">
+                <a class="text-decoration-none text-reset ts-kpi-link"
+                   href="{{ route('traffic-sentinel.online.bots', $qs) }}">
+                    <div class="ts-kpi green p-3">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="label">Online Bots</div>
+                                <div class="value">{{ ts_human_number($onlineBots) }}</div>
+                                <div class="hint">Crawlers / tools</div>
+                            </div>
+                            <span class="ts-badge"><i class="bi bi-robot me-1"></i>Live</span>
                         </div>
-                        <span class="ts-badge"><i class="bi bi-robot me-1"></i>Live</span>
                     </div>
-                </div>
-            </a>
-        </div>
+                </a>
+            </div>
+        @endif
 
         <div class="col-12 col-md-6 col-xl-2">
             <a class="text-decoration-none text-reset ts-kpi-link"
@@ -656,37 +677,74 @@
                 </div>
             </a>
         </div>
+            @if(!empty($includeHumans))
+                <div class="col-12 col-md-6 col-xl-2">
+                    <a class="text-decoration-none text-reset ts-kpi-link" href="{{ route($rIpLogsHumans, $qs) }}">
+                        <div class="ts-kpi orange p-3">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <div class="label">IP Logs (Humans)</div>
+                                    <div class="value">{{ ts_human_number($data['unique_ips_humans'] ?? 0) }}</div>
+                                    <div class="hint">{{ $qRange === 'today' ? 'Today' : "Last $days days" }}</div>
+                                </div>
+                                <span class="ts-badge"><i class="bi bi-list-ul me-1"></i>Logs</span>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            @endif
+
+            @if(!empty($includeBots))
+                <div class="col-12 col-md-6 col-xl-2">
+                    <a class="text-decoration-none text-reset ts-kpi-link" href="{{ route($rIpLogsBots, $qs) }}">
+                        <div class="ts-kpi green p-3">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <div class="label">IP Logs (Bots)</div>
+                                    <div class="value">{{ ts_human_number($data['unique_ips_bots'] ?? 0) }}</div>
+                                    <div class="hint">{{ $qRange === 'today' ? 'Today' : "Last $days days" }}</div>
+                                </div>
+                                <span class="ts-badge"><i class="bi bi-list-check me-1"></i>Logs</span>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            @endif
     </div>
 
     {{-- Secondary KPIs --}}
     <div class="row g-3 mb-3">
-        <div class="col-12 col-lg-6">
-            <a class="text-decoration-none text-reset d-block"
-               href="{{ route('traffic-sentinel.pageviews.humans', $qs) }}">
-                <div class="ts-card p-3">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div class="fw-semibold"><i class="bi bi-eye me-2"></i>Pageviews (Humans)</div>
-                        <span class="ts-badge">Range: {{ $qRange === 'today' ? 'Today' : "Last $days days" }}</span>
-                    </div>
-                    <div class="display-6 fw-bold mb-0">{{ ts_human_number($data['pageviews_humans'] ?? 0) }}</div>
-                    <div class="ts-subtitle mt-1">Counts only non-bot requests</div>
-                </div>
-            </a>
-        </div>
+        @if(!empty($includeHumans))
 
-        <div class="col-12 col-lg-6">
-            <a class="text-decoration-none text-reset d-block"
-               href="{{ route('traffic-sentinel.pageviews.all', $qs) }}">
-                <div class="ts-card p-3">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div class="fw-semibold"><i class="bi bi-collection me-2"></i>Pageviews (All)</div>
-                        <span class="ts-badge">Humans + Bots</span>
+            <div class="col-12 col-lg-6">
+                <a class="text-decoration-none text-reset d-block"
+                   href="{{ route('traffic-sentinel.pageviews.humans', $qs) }}">
+                    <div class="ts-card p-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div class="fw-semibold"><i class="bi bi-eye me-2"></i>Pageviews (Humans)</div>
+                            <span class="ts-badge">Range: {{ $qRange === 'today' ? 'Today' : "Last $days days" }}</span>
+                        </div>
+                        <div class="display-6 fw-bold mb-0">{{ ts_human_number($data['pageviews_humans'] ?? 0) }}</div>
+                        <div class="ts-subtitle mt-1">Counts only non-bot requests</div>
                     </div>
-                    <div class="display-6 fw-bold mb-0">{{ ts_human_number($data['pageviews_all'] ?? 0) }}</div>
-                    <div class="ts-subtitle mt-1">Includes crawlers and automation</div>
-                </div>
-            </a>
-        </div>
+                </a>
+            </div>
+        @endif
+        @if(($mode ?? 'humans') === 'both')
+            <div class="col-12 col-lg-6">
+                <a class="text-decoration-none text-reset d-block"
+                   href="{{ route('traffic-sentinel.pageviews.all', $qs) }}">
+                    <div class="ts-card p-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div class="fw-semibold"><i class="bi bi-collection me-2"></i>Pageviews (All)</div>
+                            <span class="ts-badge">Humans + Bots</span>
+                        </div>
+                        <div class="display-6 fw-bold mb-0">{{ ts_human_number($data['pageviews_all'] ?? 0) }}</div>
+                        <div class="ts-subtitle mt-1">Includes crawlers and automation</div>
+                    </div>
+                </a>
+            </div>
+        @endif
     </div>
     <div class="row g-3 mb-3">
         <div class="col-12 col-xl-8">
@@ -897,26 +955,30 @@
     (function () {
         const labels = @json($chartLabels);
         const humans = @json($chartHumans);
-        const bots   = @json($chartBots);
-        const mix    = @json($chartMix);
+        const bots = @json($chartBots);
+        const mix = @json($chartMix);
+
+        // Build datasets AFTER humans/bots exist
+        const datasets = [];
+        if (Array.isArray(humans) && humans.length) datasets.push({label: 'Humans', data: humans, tension: 0.3});
+        if (Array.isArray(bots) && bots.length) datasets.push({label: 'Bots', data: bots, tension: 0.3});
+
+        // If nothing to show, keep at least one dataset (optional safety)
+        if (!datasets.length) {
+            datasets.push({label: 'Humans', data: [], tension: 0.3});
+        }
 
         const el1 = document.getElementById('tsChartPageviews');
         if (el1) {
             new Chart(el1, {
                 type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        { label: 'Humans', data: humans, tension: 0.3 },
-                        { label: 'Bots', data: bots, tension: 0.3 }
-                    ]
-                },
+                data: {labels, datasets},
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    interaction: { mode: 'index', intersect: false },
-                    plugins: { legend: { display: true } },
-                    scales: { y: { beginAtZero: true } }
+                    interaction: {mode: 'index', intersect: false},
+                    plugins: {legend: {display: true}},
+                    scales: {y: {beginAtZero: true}}
                 }
             });
         }
@@ -939,7 +1001,7 @@
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { legend: { position: 'bottom' } },
+                    plugins: {legend: {position: 'bottom'}},
                     cutout: '65%'
                 }
             });

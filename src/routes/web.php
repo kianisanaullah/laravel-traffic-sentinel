@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Kianisanaullah\TrafficSentinel\Http\Controllers\DashboardController;
 use Kianisanaullah\TrafficSentinel\Http\Controllers\ExploreController;
+use Kianisanaullah\TrafficSentinel\Http\Controllers\IpLogsController;
 
 Route::group([
     'prefix' => config('traffic-sentinel.dashboard.prefix', 'admin/traffic-sentinel'),
@@ -38,7 +39,36 @@ Route::group([
 
     Route::get('/unique-ips/bots', [ExploreController::class, 'uniqueIpsBots'])
         ->name('traffic-sentinel.unique.ips.bots');
-});
+
+
+    Route::get('/traffic-sentinel', [DashboardController::class, 'index'])->name('traffic-sentinel.dashboard');
+
+    Route::get('/traffic-sentinel/users', [DashboardController::class, 'users'])->name('traffic-sentinel.users');
+    Route::get('/traffic-sentinel/users/{userId}', [DashboardController::class, 'userShow'])->name('traffic-sentinel.users.show');
+
+    Route::get('/traffic-sentinel/sessions/{sessionId}/journey', [DashboardController::class, 'sessionJourney'])
+        ->name('traffic-sentinel.session.journey');
+
+    // Humans IP logs
+    Route::get('/ip-logs/humans', [\Kianisanaullah\TrafficSentinel\Http\Controllers\IpLogsController::class, 'humans'])
+        ->name('traffic-sentinel.ip-logs.humans');
+
+    Route::get('/ip-logs/humans/data', [\Kianisanaullah\TrafficSentinel\Http\Controllers\IpLogsController::class, 'humansData'])
+        ->name('traffic-sentinel.ip-logs.humans.data');
+
+    // Bots IP logs
+    Route::get('/ip-logs/bots', [\Kianisanaullah\TrafficSentinel\Http\Controllers\IpLogsController::class, 'bots'])
+        ->name('traffic-sentinel.ip-logs.bots');
+
+    Route::get('/ip-logs/bots/data', [\Kianisanaullah\TrafficSentinel\Http\Controllers\IpLogsController::class, 'botsData'])
+        ->name('traffic-sentinel.ip-logs.bots.data');
+
+    // Optional focus routes (if you want them)
+    Route::get('/ip-logs/humans/focus/{ip}', [\Kianisanaullah\TrafficSentinel\Http\Controllers\IpLogsController::class, 'humansFocus'])
+        ->name('traffic-sentinel.ip-logs.humans.focus');
+
+    Route::get('/ip-logs/bots/focus/{ip}', [\Kianisanaullah\TrafficSentinel\Http\Controllers\IpLogsController::class, 'botsFocus'])
+        ->name('traffic-sentinel.ip-logs.bots.focus');});
 
 Route::get(
     '/traffic-sentinel/assets/{file}',
