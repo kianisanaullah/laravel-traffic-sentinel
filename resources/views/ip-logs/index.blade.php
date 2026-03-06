@@ -212,7 +212,7 @@
                                 </a>
 
                                 <a class="ip_link"
-                                   href="{{ route('traffic-sentinel.ip-logs.focus', ['ip' => $ipCountD->ip,'mode' => $mode]) }}">
+                                   href="{{ route($mode === 'bots' ? 'traffic-sentinel.ip-logs.bots.focus' : 'traffic-sentinel.ip-logs.humans.focus', ['ip' => $ipCountD->ip]) }}">
                                     <i class="bi bi-bullseye me-1"></i>Focus
                                 </a>
                             </td>
