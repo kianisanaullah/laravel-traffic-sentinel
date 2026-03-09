@@ -14,10 +14,7 @@ class TrafficPageviewHuman extends Model
 
         $this->connection = config('traffic-sentinel.database.connection', 'mysql');
     }
-    protected $fillable = [
-        'app_key','traffic_session_id','host','method','path','full_url','route_name',
-        'status_code','duration_ms','viewed_at',
-    ];
+    protected $guarded = [];
 
     protected $casts = [
         'viewed_at' => 'datetime',
