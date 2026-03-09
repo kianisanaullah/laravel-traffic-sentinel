@@ -7,7 +7,13 @@ use Illuminate\Database\Eloquent\Model;
 class TrafficSessionBot extends Model
 {
     protected $table = 'traffic_sessions_bots';
+    protected $connection;
+    public function __construct(array $attributes = [])
+    {
+        parent::__construct($attributes);
 
+        $this->connection = config('traffic-sentinel.database.connection', 'mysql');
+    }
     protected $fillable = [
         'app_key','session_id','visitor_key','host','bot_name','ip','ip_raw','user_agent','device_type',
         'referrer','landing_url','first_seen_at','last_seen_at','user_id',

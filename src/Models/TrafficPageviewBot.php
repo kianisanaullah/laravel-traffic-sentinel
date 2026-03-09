@@ -7,7 +7,13 @@ use Illuminate\Database\Eloquent\Model;
 class TrafficPageviewBot extends Model
 {
     protected $table = 'traffic_pageviews_bots';
+    protected $connection;
+    public function __construct(array $attributes = [])
+    {
+        parent::__construct($attributes);
 
+        $this->connection = config('traffic-sentinel.database.connection', 'mysql');
+    }
     protected $fillable = [
         'app_key','traffic_session_id','host','bot_name','method','path','full_url','route_name',
         'status_code','duration_ms','viewed_at',
