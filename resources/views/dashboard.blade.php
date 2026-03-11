@@ -560,6 +560,12 @@
                         <i class="bi bi-arrow-90deg-left me-1"></i>Referrers
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link @if(request()->routeIs('traffic-sentinel.bots.*')) active @endif"
+                       href="{{ route('traffic-sentinel.bots.index', $qs) }}">
+                        <i class="bi bi-robot me-1"></i>Bots
+                    </a>
+                </li>
             </ul>
         </div>
 

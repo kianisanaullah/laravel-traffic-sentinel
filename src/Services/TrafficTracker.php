@@ -25,6 +25,18 @@ class TrafficTracker
         $ua = (string) $request->userAgent();
         $ipStored = $this->ipToStore($request->ip());
 
+        $blocked = DB::table('traffic_bot_blocks')
+            ->where('ip', $ipStored)
+            ->where(function ($q) {
+                $q->whereNull('blocked_until')
+                    ->orWhere('blocked_until', '>', now());
+            })
+            ->exists();
+
+        if ($blocked) {
+            return;
+        }
+
         $visitorKey = $this->makeVisitorKey($ipStored, $ua, $visitorId);
 
         $host = strtolower((string) $request->getHost());
@@ -351,5 +363,14 @@ class TrafficTracker
         }
 
         return null;
+    }
+    public function detectBotFromRequest(Request $request): array
+    {
+        return $this->detectBot($request);
+    }
+
+    public function ipForStorage(?string $ip): ?string
+    {
+        return $this->ipToStore($ip);
     }
 }

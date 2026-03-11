@@ -2,17 +2,18 @@
 
 namespace Kianisanaullah\TrafficSentinel;
 
-use Illuminate\Support\ServiceProvider;
 use Illuminate\Pagination\Paginator;
+use Illuminate\Support\ServiceProvider;
+use Kianisanaullah\TrafficSentinel\Console\Commands\BackfillSplitTables;
 use Kianisanaullah\TrafficSentinel\Console\Commands\IpDataInstallCommand;
 use Kianisanaullah\TrafficSentinel\Console\Commands\TrafficPruneCommand;
-use Kianisanaullah\TrafficSentinel\Console\Commands\TrafficSentinelInstallIpData;
-use Kianisanaullah\TrafficSentinel\Console\Commands\BackfillSplitTables;
 use Kianisanaullah\TrafficSentinel\Http\Middleware\TrackTraffic;
+use Kianisanaullah\TrafficSentinel\Services\Bots\BotProtectionService;
+use Kianisanaullah\TrafficSentinel\Services\RuntimeIpLookupService;
 use Kianisanaullah\TrafficSentinel\Services\TrafficStats;
 use Kianisanaullah\TrafficSentinel\Services\TrafficStatsRange;
 use Kianisanaullah\TrafficSentinel\Services\TrafficTracker;
-use Kianisanaullah\TrafficSentinel\Services\RuntimeIpLookupService;
+use Kianisanaullah\TrafficSentinel\Services\Bots\BotRuleService;
 
 
 class TrafficSentinelServiceProvider extends ServiceProvider
@@ -21,10 +22,31 @@ class TrafficSentinelServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(__DIR__ . '/../config/traffic-sentinel.php', 'traffic-sentinel');
 
+        /*
+        |--------------------------------------------------------------------------
+        | Core Services
+        |--------------------------------------------------------------------------
+        */
         $this->app->singleton(TrafficTracker::class, fn () => new TrafficTracker());
         $this->app->singleton(TrafficStats::class, fn () => new TrafficStats());
         $this->app->singleton(TrafficStatsRange::class, fn () => new TrafficStatsRange());
         $this->app->singleton(RuntimeIpLookupService::class, fn () => new RuntimeIpLookupService());
+
+        /*
+        |--------------------------------------------------------------------------
+        | Protection / Rules
+        |--------------------------------------------------------------------------
+        */
+        $this->app->singleton(BotProtectionService::class, fn () => new BotProtectionService());
+        $this->app->singleton(BotRuleService::class, fn () => new BotRuleService());
+
+        /*
+        |--------------------------------------------------------------------------
+        | Optional Bot Services
+        |--------------------------------------------------------------------------
+        */
+        // $this->app->singleton(BotAnalyticsService::class, fn () => new BotAnalyticsService());
+        // $this->app->singleton(BotTrafficService::class, fn () => new BotTrafficService());
     }
 
     public function boot(): void
@@ -33,46 +55,61 @@ class TrafficSentinelServiceProvider extends ServiceProvider
 
         $router = $this->app['router'];
 
-        /* -------------------------------------------------
-         | Middleware auto-registration
-         |-------------------------------------------------*/
+        /*
+        |--------------------------------------------------------------------------
+        | Middleware auto-registration
+        |--------------------------------------------------------------------------
+        */
         $router->aliasMiddleware('traffic.sentinel', TrackTraffic::class);
 
         if (config('traffic-sentinel.middleware.auto_register', true)) {
             $router->pushMiddlewareToGroup('web', TrackTraffic::class);
         }
-        // Config
-        $this->publishes([
-            __DIR__ . '/../config/traffic-sentinel.php' => config_path('traffic-sentinel.php'),
-        ], 'traffic-sentinel-config');
 
-        // Migrations
-        $this->publishes([
-            __DIR__ . '/Database/migrations' => database_path('migrations'),
-        ], 'traffic-sentinel-migrations');
-
-        // Assets
-        $this->publishes([
-            __DIR__ . '/../resources/assets' => public_path('vendor/traffic-sentinel'),
-        ], 'traffic-sentinel-assets');
-
-        // Views
+        /*
+        |--------------------------------------------------------------------------
+        | Views
+        |--------------------------------------------------------------------------
+        */
         $this->loadViewsFrom(__DIR__ . '/../resources/views', 'traffic-sentinel');
 
-        // Optional
-        $this->publishes([
-            __DIR__ . '/../resources/views' => resource_path('views/vendor/traffic-sentinel'),
-        ], 'traffic-sentinel-views');
-
-        // Routes
+        /*
+        |--------------------------------------------------------------------------
+        | Routes
+        |--------------------------------------------------------------------------
+        */
         if (config('traffic-sentinel.dashboard.enabled', true)) {
             $this->loadRoutesFrom(__DIR__ . '/routes/web.php');
         }
 
-        // Commands
+        /*
+        |--------------------------------------------------------------------------
+        | Publishable Resources
+        |--------------------------------------------------------------------------
+        */
+        $this->publishes([
+            __DIR__ . '/../config/traffic-sentinel.php' => config_path('traffic-sentinel.php'),
+        ], 'traffic-sentinel-config');
+
+        $this->publishes([
+            __DIR__ . '/Database/migrations' => database_path('migrations'),
+        ], 'traffic-sentinel-migrations');
+
+        $this->publishes([
+            __DIR__ . '/../resources/assets' => public_path('vendor/traffic-sentinel'),
+        ], 'traffic-sentinel-assets');
+
+        $this->publishes([
+            __DIR__ . '/../resources/views' => resource_path('views/vendor/traffic-sentinel'),
+        ], 'traffic-sentinel-views');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Console Commands
+        |--------------------------------------------------------------------------
+        */
         if ($this->app->runningInConsole()) {
             $this->commands([
-                TrafficPruneCommand::class,
                 TrafficPruneCommand::class,
                 IpDataInstallCommand::class,
                 BackfillSplitTables::class,

@@ -256,4 +256,5 @@ return [
         // keep last N days of raw data (0 = disabled)
         'keep_days' => 120,
     ],
+
 ];

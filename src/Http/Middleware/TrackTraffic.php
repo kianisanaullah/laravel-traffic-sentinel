@@ -6,6 +6,7 @@ use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Kianisanaullah\TrafficSentinel\Services\TrafficTracker;
+use Kianisanaullah\TrafficSentinel\Services\Bots\BotProtectionService;
 
 class TrackTraffic
 {
@@ -33,6 +34,27 @@ class TrackTraffic
 
         [$visitorId, $isNewVisitorId] = $this->getOrCreateVisitorId($request);
 
+        $tracker = app(TrafficTracker::class);
+        $protection = app(BotProtectionService::class);
+
+        $ipStored = $tracker->ipForStorage($request->ip());
+        $host = strtolower((string) $request->getHost());
+        $app = config('traffic-sentinel.tracking.app_key');
+
+        [$isBot, $botName] = $tracker->detectBotFromRequest($request);
+
+        $rule = $protection->check($botName, $ipStored, $host, $app);
+
+        if ($rule) {
+            if ($rule->action === 'block') {
+                abort(403, 'Blocked');
+            }
+
+            if ($rule->action === 'throttle') {
+                $this->enforceThrottle($ipStored, $rule);
+            }
+        }
+
         $start = microtime(true);
 
         $response = $next($request);
@@ -56,7 +78,7 @@ class TrackTraffic
                 }
             }
 
-            app(TrafficTracker::class)->track(
+            $tracker->track(
                 $request,
                 $durationMs,
                 $status,
@@ -71,6 +93,52 @@ class TrackTraffic
         }
 
         return $response;
+    }
+
+    private function enforceThrottle(?string $ipStored, $rule): void
+    {
+        if (!$ipStored) {
+            return;
+        }
+
+        if (!empty($rule->limit_per_minute)) {
+            $key = 'ts_ip_rate_min:' . $ipStored;
+            $hits = cache()->increment($key);
+
+            if ($hits === 1) {
+                cache()->put($key, 1, now()->addMinute());
+            }
+
+            if ($hits > (int) $rule->limit_per_minute) {
+                abort(429, 'Too many requests per minute');
+            }
+        }
+
+        if (!empty($rule->limit_per_hour)) {
+            $key = 'ts_ip_rate_hour:' . $ipStored;
+            $hits = cache()->increment($key);
+
+            if ($hits === 1) {
+                cache()->put($key, 1, now()->addHour());
+            }
+
+            if ($hits > (int) $rule->limit_per_hour) {
+                abort(429, 'Too many requests per hour');
+            }
+        }
+
+        if (!empty($rule->limit_per_day)) {
+            $key = 'ts_ip_rate_day:' . $ipStored;
+            $hits = cache()->increment($key);
+
+            if ($hits === 1) {
+                cache()->put($key, 1, now()->addDay());
+            }
+
+            if ($hits > (int) $rule->limit_per_day) {
+                abort(429, 'Too many requests per day');
+            }
+        }
     }
 
     protected function getOrCreateVisitorId(Request $request): array

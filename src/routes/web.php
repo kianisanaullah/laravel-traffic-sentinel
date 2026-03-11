@@ -1,77 +1,185 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Kianisanaullah\TrafficSentinel\Http\Controllers\AssetController;
+use Kianisanaullah\TrafficSentinel\Http\Controllers\BotController;
 use Kianisanaullah\TrafficSentinel\Http\Controllers\DashboardController;
 use Kianisanaullah\TrafficSentinel\Http\Controllers\ExploreController;
 use Kianisanaullah\TrafficSentinel\Http\Controllers\IpLogsController;
+use Kianisanaullah\TrafficSentinel\Http\Controllers\IpRuleController;
 
 Route::group([
     'prefix' => config('traffic-sentinel.dashboard.prefix', 'admin/traffic-sentinel'),
     'middleware' => config('traffic-sentinel.dashboard.middleware', ['web']),
 ], function () {
-    Route::get('/', [DashboardController::class, 'index'])->name('traffic-sentinel.dashboard');
 
-    // Online
-    Route::get('/online/humans', [ExploreController::class, 'onlineHumans'])->name('traffic-sentinel.online.humans');
-    Route::get('/online/bots', [ExploreController::class, 'onlineBots'])->name('traffic-sentinel.online.bots');
+    /*
+    |--------------------------------------------------------------------------
+    | Dashboard
+    |--------------------------------------------------------------------------
+    */
+    Route::get('/', [DashboardController::class, 'index'])
+        ->name('traffic-sentinel.dashboard');
 
-    // Unique
-    Route::get('/unique/humans', [ExploreController::class, 'uniqueHumans'])->name('traffic-sentinel.unique.humans');
-    Route::get('/unique/bots', [ExploreController::class, 'uniqueBots'])->name('traffic-sentinel.unique.bots');
+    Route::get('/users', [DashboardController::class, 'users'])
+        ->name('traffic-sentinel.users');
 
-    // Pageviews
-    Route::get('/pageviews/humans', [ExploreController::class, 'pageviewsHumans'])->name('traffic-sentinel.pageviews.humans');
-    Route::get('/pageviews/all', [ExploreController::class, 'pageviewsAll'])->name('traffic-sentinel.pageviews.all');
+    Route::get('/users/{userId}', [DashboardController::class, 'userShow'])
+        ->name('traffic-sentinel.users.show');
 
-    // Pages + Referrers
-    Route::get('/pages', [ExploreController::class, 'pages'])->name('traffic-sentinel.pages');
-    Route::get('/referrers', [ExploreController::class, 'referrers'])->name('traffic-sentinel.referrers');
+    Route::get('/sessions/{sessionId}/journey', [DashboardController::class, 'sessionJourney'])
+        ->name('traffic-sentinel.session.journey');
 
-    // Drilldowns
-    Route::get('/pages/path', [ExploreController::class, 'pageviewsByPath'])->name('traffic-sentinel.pages.path');
-    Route::get('/referrers/show', [ExploreController::class, 'sessionsByReferrer'])->name('traffic-sentinel.referrers.show');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Online
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('online')->group(function () {
+        Route::get('/humans', [ExploreController::class, 'onlineHumans'])
+            ->name('traffic-sentinel.online.humans');
+
+        Route::get('/bots', [ExploreController::class, 'onlineBots'])
+            ->name('traffic-sentinel.online.bots');
+    });
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Unique
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('unique')->group(function () {
+        Route::get('/humans', [ExploreController::class, 'uniqueHumans'])
+            ->name('traffic-sentinel.unique.humans');
+
+        Route::get('/bots', [ExploreController::class, 'uniqueBots'])
+            ->name('traffic-sentinel.unique.bots');
+    });
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Pageviews
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('pageviews')->group(function () {
+        Route::get('/humans', [ExploreController::class, 'pageviewsHumans'])
+            ->name('traffic-sentinel.pageviews.humans');
+
+        Route::get('/all', [ExploreController::class, 'pageviewsAll'])
+            ->name('traffic-sentinel.pageviews.all');
+    });
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Pages + Referrers
+    |--------------------------------------------------------------------------
+    */
+    Route::get('/pages', [ExploreController::class, 'pages'])
+        ->name('traffic-sentinel.pages');
+
+    Route::get('/pages/path', [ExploreController::class, 'pageviewsByPath'])
+        ->name('traffic-sentinel.pages.path');
+
+    Route::get('/referrers', [ExploreController::class, 'referrers'])
+        ->name('traffic-sentinel.referrers');
+
+    Route::get('/referrers/show', [ExploreController::class, 'sessionsByReferrer'])
+        ->name('traffic-sentinel.referrers.show');
+
     Route::get('/ip/lookup', [ExploreController::class, 'ipLookup'])
         ->name('traffic-sentinel.ip.lookup');
 
-    // IPs
-    Route::get('/unique-ips/humans', [ExploreController::class, 'uniqueIpsHumans'])
-        ->name('traffic-sentinel.unique.ips.humans');
 
-    Route::get('/unique-ips/bots', [ExploreController::class, 'uniqueIpsBots'])
-        ->name('traffic-sentinel.unique.ips.bots');
+    /*
+    |--------------------------------------------------------------------------
+    | Unique IPs
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('unique-ips')->group(function () {
+        Route::get('/humans', [ExploreController::class, 'uniqueIpsHumans'])
+            ->name('traffic-sentinel.unique.ips.humans');
+
+        Route::get('/bots', [ExploreController::class, 'uniqueIpsBots'])
+            ->name('traffic-sentinel.unique.ips.bots');
+    });
 
 
-    Route::get('/traffic-sentinel', [DashboardController::class, 'index'])->name('traffic-sentinel.dashboard');
+    /*
+    |--------------------------------------------------------------------------
+    | IP Logs
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('ip-logs')->group(function () {
+        Route::get('/humans', [IpLogsController::class, 'humans'])
+            ->name('traffic-sentinel.ip-logs.humans');
 
-    Route::get('/traffic-sentinel/users', [DashboardController::class, 'users'])->name('traffic-sentinel.users');
-    Route::get('/traffic-sentinel/users/{userId}', [DashboardController::class, 'userShow'])->name('traffic-sentinel.users.show');
+        Route::get('/humans/data', [IpLogsController::class, 'humansData'])
+            ->name('traffic-sentinel.ip-logs.humans.data');
 
-    Route::get('/traffic-sentinel/sessions/{sessionId}/journey', [DashboardController::class, 'sessionJourney'])
-        ->name('traffic-sentinel.session.journey');
+        Route::get('/humans/focus/{ip}', [IpLogsController::class, 'humansFocus'])
+            ->name('traffic-sentinel.ip-logs.humans.focus');
 
-    // Humans IP logs
-    Route::get('/ip-logs/humans', [\Kianisanaullah\TrafficSentinel\Http\Controllers\IpLogsController::class, 'humans'])
-        ->name('traffic-sentinel.ip-logs.humans');
+        Route::get('/bots', [IpLogsController::class, 'bots'])
+            ->name('traffic-sentinel.ip-logs.bots');
 
-    Route::get('/ip-logs/humans/data', [\Kianisanaullah\TrafficSentinel\Http\Controllers\IpLogsController::class, 'humansData'])
-        ->name('traffic-sentinel.ip-logs.humans.data');
+        Route::get('/bots/data', [IpLogsController::class, 'botsData'])
+            ->name('traffic-sentinel.ip-logs.bots.data');
 
-    // Bots IP logs
-    Route::get('/ip-logs/bots', [\Kianisanaullah\TrafficSentinel\Http\Controllers\IpLogsController::class, 'bots'])
-        ->name('traffic-sentinel.ip-logs.bots');
+        Route::get('/bots/focus/{ip}', [IpLogsController::class, 'botsFocus'])
+            ->name('traffic-sentinel.ip-logs.bots.focus');
+    });
 
-    Route::get('/ip-logs/bots/data', [\Kianisanaullah\TrafficSentinel\Http\Controllers\IpLogsController::class, 'botsData'])
-        ->name('traffic-sentinel.ip-logs.bots.data');
 
-    // Optional focus routes (if you want them)
-    Route::get('/ip-logs/humans/focus/{ip}', [\Kianisanaullah\TrafficSentinel\Http\Controllers\IpLogsController::class, 'humansFocus'])
-        ->name('traffic-sentinel.ip-logs.humans.focus');
+    /*
+    |--------------------------------------------------------------------------
+    | Bot Rules
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('bots')->group(function () {
+        Route::get('/', [BotController::class, 'index'])
+            ->name('traffic-sentinel.bots.index');
 
-    Route::get('/ip-logs/bots/focus/{ip}', [\Kianisanaullah\TrafficSentinel\Http\Controllers\IpLogsController::class, 'botsFocus'])
-        ->name('traffic-sentinel.ip-logs.bots.focus');});
+        Route::post('/block', [BotController::class, 'block'])
+            ->name('traffic-sentinel.bots.block');
 
-Route::get(
-    '/traffic-sentinel/assets/{file}',
-    [\Kianisanaullah\TrafficSentinel\Http\Controllers\AssetController::class, 'show']
-)->where('file', '.*')
+        Route::post('/throttle', [BotController::class, 'throttle'])
+            ->name('traffic-sentinel.bots.throttle');
+
+        Route::post('/monitor', [BotController::class, 'monitor'])
+            ->name('traffic-sentinel.bots.monitor');
+    });
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | IP Rules
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('ips')->group(function () {
+        Route::get('/', [IpRuleController::class, 'index'])
+            ->name('traffic-sentinel.ips.index');
+
+        Route::post('/monitor', [IpRuleController::class, 'monitor'])
+            ->name('traffic-sentinel.ips.monitor');
+
+        Route::post('/block', [IpRuleController::class, 'block'])
+            ->name('traffic-sentinel.ips.block');
+
+        Route::post('/throttle', [IpRuleController::class, 'throttle'])
+            ->name('traffic-sentinel.ips.throttle');
+    });
+});
+
+
+/*
+|--------------------------------------------------------------------------
+| Package Assets
+|--------------------------------------------------------------------------
+*/
+Route::get('/traffic-sentinel/assets/{file}', [AssetController::class, 'show'])
+    ->where('file', '.*')
     ->name('traffic-sentinel.asset');
