@@ -4,6 +4,7 @@ namespace Kianisanaullah\TrafficSentinel\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Kianisanaullah\TrafficSentinel\Services\TrafficTracker;
 use Kianisanaullah\TrafficSentinel\Services\Bots\BotProtectionService;
@@ -51,7 +52,7 @@ class TrackTraffic
             }
 
             if ($rule->action === 'throttle') {
-                $this->enforceThrottle($ipStored, $rule);
+                $this->enforceThrottle($ipStored, $botName, $host, $app, $rule);
             }
         }
 
@@ -78,12 +79,7 @@ class TrackTraffic
                 }
             }
 
-            $tracker->track(
-                $request,
-                $durationMs,
-                $status,
-                $visitorId
-            );
+            $tracker->track($request, $durationMs, $status, $visitorId);
         } catch (\Throwable $e) {
             \Log::error('TrafficSentinel track failed', [
                 'msg'  => $e->getMessage(),
@@ -95,49 +91,58 @@ class TrackTraffic
         return $response;
     }
 
-    private function enforceThrottle(?string $ipStored, $rule): void
+    private function enforceThrottle(?string $ipStored, ?string $botName, ?string $host, ?string $app, $rule): void
     {
-        if (!$ipStored) {
+        $baseKey = $this->throttleKey($ipStored, $botName, $host, $app, $rule);
+
+        if (!$baseKey) {
             return;
         }
 
         if (!empty($rule->limit_per_minute)) {
-            $key = 'ts_ip_rate_min:' . $ipStored;
-            $hits = cache()->increment($key);
-
-            if ($hits === 1) {
-                cache()->put($key, 1, now()->addMinute());
-            }
-
-            if ($hits > (int) $rule->limit_per_minute) {
-                abort(429, 'Too many requests per minute');
-            }
+            $this->checkThrottleWindow($baseKey . ':min', (int) $rule->limit_per_minute, 60, 'Too many requests per minute');
         }
 
         if (!empty($rule->limit_per_hour)) {
-            $key = 'ts_ip_rate_hour:' . $ipStored;
-            $hits = cache()->increment($key);
-
-            if ($hits === 1) {
-                cache()->put($key, 1, now()->addHour());
-            }
-
-            if ($hits > (int) $rule->limit_per_hour) {
-                abort(429, 'Too many requests per hour');
-            }
+            $this->checkThrottleWindow($baseKey . ':hour', (int) $rule->limit_per_hour, 3600, 'Too many requests per hour');
         }
 
         if (!empty($rule->limit_per_day)) {
-            $key = 'ts_ip_rate_day:' . $ipStored;
-            $hits = cache()->increment($key);
+            $this->checkThrottleWindow($baseKey . ':day', (int) $rule->limit_per_day, 86400, 'Too many requests per day');
+        }
+    }
 
-            if ($hits === 1) {
-                cache()->put($key, 1, now()->addDay());
-            }
+    private function throttleKey(?string $ipStored, ?string $botName, ?string $host, ?string $app, $rule): ?string
+    {
+        if (!empty($rule->ip) && $ipStored) {
+            return 'ts_rate_ip:' . $ipStored;
+        }
 
-            if ($hits > (int) $rule->limit_per_day) {
-                abort(429, 'Too many requests per day');
-            }
+        if (!empty($rule->bot_name) && $botName) {
+            return 'ts_rate_bot:' . strtolower($botName);
+        }
+
+        if (!empty($rule->host) && $host) {
+            return 'ts_rate_host:' . strtolower($host);
+        }
+
+        if (!empty($rule->app_key) && $app) {
+            return 'ts_rate_app:' . strtolower($app);
+        }
+
+        return $ipStored ? 'ts_rate_ip:' . $ipStored : null;
+    }
+
+    private function checkThrottleWindow(string $key, int $limit, int $ttlSeconds, string $message): void
+    {
+        if (!Cache::has($key)) {
+            Cache::put($key, 0, now()->addSeconds($ttlSeconds));
+        }
+
+        $hits = Cache::increment($key);
+
+        if ($hits > $limit) {
+            abort(429, $message);
         }
     }
 
@@ -222,9 +227,7 @@ class TrackTraffic
         $accept = strtolower((string) $request->header('accept'));
         if (str_contains($accept, 'application/json')) return true;
 
-        if ($request->wantsJson()) return true;
-
-        return false;
+        return $request->wantsJson();
     }
 
     protected function isLivewire(Request $request): bool
@@ -232,8 +235,6 @@ class TrackTraffic
         if ($request->hasHeader('x-livewire')) return true;
 
         $path = ltrim((string) $request->path(), '/');
-        if (str_starts_with($path, 'livewire/')) return true;
-
-        return false;
+        return str_starts_with($path, 'livewire/');
     }
 }
