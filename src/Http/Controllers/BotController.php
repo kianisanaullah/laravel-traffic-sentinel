@@ -9,20 +9,48 @@ use Kianisanaullah\TrafficSentinel\Services\Bots\BotRuleService;
 
 class BotController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
+        $q = trim((string) $request->get('q', ''));
+        $statusFilter = trim((string) $request->get('status', ''));
+        $days = (int) $request->get('days', 15);
+
+        if ($days <= 0) {
+            $days = 15;
+        }
+
+        if ($days > 90) {
+            $days = 90;
+        }
+
+        $limitDate = now()->subDays($days);
+
         $bots = DB::table('traffic_sessions_bots')
             ->selectRaw('
-        COALESCE(bot_name, "unknown") as bot_name,
-        COUNT(*) as sessions,
-        COUNT(DISTINCT ip) as ips,
-        MAX(last_seen_at) as last_seen
-    ')
+            COALESCE(bot_name, "unknown") as bot_name,
+            COUNT(*) as sessions,
+            COUNT(DISTINCT ip) as ips,
+            MAX(last_seen_at) as last_seen
+        ')
+            ->where('last_seen_at', '>=', $limitDate)
+            ->when($q !== '', function ($query) use ($q) {
+                $query->where(function ($sub) use ($q) {
+                    $sub->where('bot_name', 'like', '%' . $q . '%')
+                        ->orWhereNull('bot_name');
+                });
+            })
             ->groupBy('bot_name')
             ->orderByDesc('sessions')
-            ->get();
+            ->paginate(50)
+            ->withQueryString();
+
+        $botNames = collect($bots->items())
+            ->pluck('bot_name')
+            ->filter()
+            ->values();
 
         $rules = DB::table('traffic_bot_rules')
+            ->whereIn('bot_name', $botNames)
             ->select(
                 'bot_name',
                 'action',
@@ -33,8 +61,23 @@ class BotController extends Controller
             ->get()
             ->keyBy('bot_name');
 
+        if ($statusFilter !== '') {
+            $bots->setCollection(
+                $bots->getCollection()->filter(function ($bot) use ($rules, $statusFilter) {
+                    $rule = $rules[$bot->bot_name] ?? null;
 
-        return view('traffic-sentinel::bots.index', compact('bots','rules'));
+                    $status = !$rule
+                        ? 'unconfigured'
+                        : ($rule->action === 'block'
+                            ? 'block'
+                            : ($rule->action === 'throttle' ? 'throttle' : 'monitor'));
+
+                    return $status === $statusFilter;
+                })->values()
+            );
+        }
+
+        return view('traffic-sentinel::bots.index', compact('bots', 'rules', 'days'));
     }
 
 

@@ -16,6 +16,51 @@
             </div>
         </div>
 
+        <div class="p-3 border-bottom" style="border-color: rgba(255,255,255,.08)">
+            <form method="GET" class="row g-2 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label small mb-1">Bot Name</label>
+                    <input
+                            type="text"
+                            name="q"
+                            value="{{ request('q') }}"
+                            class="form-control form-control-sm"
+                            placeholder="Search bot..."
+                    >
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label small mb-1">Status</label>
+                    <select name="status" class="form-select form-select-sm">
+                        <option value="">All</option>
+                        <option value="unconfigured" @selected(request('status') === 'unconfigured')>Unconfigured</option>
+                        <option value="monitor" @selected(request('status') === 'monitor')>Monitoring</option>
+                        <option value="throttle" @selected(request('status') === 'throttle')>Throttled</option>
+                        <option value="block" @selected(request('status') === 'block')>Blocked</option>
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label small mb-1">Days</label>
+                    <select name="days" class="form-select form-select-sm">
+                        <option value="1" @selected((string)request('days', $days ?? 15) === '1')>1 Day</option>
+                        <option value="7" @selected((string)request('days', $days ?? 15) === '7')>7 Days</option>
+                        <option value="15" @selected((string)request('days', $days ?? 15) === '15')>15 Days</option>
+                        <option value="30" @selected((string)request('days', $days ?? 15) === '30')>30 Days</option>
+                    </select>
+                </div>
+
+                <div class="col-md-4 d-flex gap-2">
+                    <button type="submit" class="btn btn-sm btn-primary">
+                        <i class="bi bi-search me-1"></i>Filter
+                    </button>
+
+                    <a href="{{ route('traffic-sentinel.bots.index') }}" class="btn btn-sm btn-outline-secondary">
+                        Reset
+                    </a>
+                </div>
+            </form>
+        </div>
         <div class="table-responsive">
             <table class="table ts-table table-hover mb-0 align-middle" id="botsTable">
                 <thead>
