@@ -15,6 +15,51 @@
             </span>
             </div>
         </div>
+        <div class="p-3 border-bottom" style="border-color: rgba(255,255,255,.08)">
+            <form method="GET" class="row g-2 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label small mb-1">IP Address</label>
+                    <input
+                            type="text"
+                            name="ip"
+                            value="{{ request('ip') }}"
+                            class="form-control form-control-sm"
+                            placeholder="Search IP..."
+                    >
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label small mb-1">Type</label>
+                    <select name="type" class="form-select form-select-sm">
+                        <option value="">All</option>
+                        <option value="human" @selected(request('type') === 'human')>Human</option>
+                        <option value="bot" @selected(request('type') === 'bot')>Bot</option>
+                        <option value="mixed" @selected(request('type') === 'mixed')>Mixed</option>
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label small mb-1">Status</label>
+                    <select name="status" class="form-select form-select-sm">
+                        <option value="">All</option>
+                        <option value="unconfigured" @selected(request('status') === 'unconfigured')>Unconfigured</option>
+                        <option value="monitor" @selected(request('status') === 'monitor')>Monitoring</option>
+                        <option value="throttle" @selected(request('status') === 'throttle')>Throttled</option>
+                        <option value="block" @selected(request('status') === 'block')>Blocked</option>
+                    </select>
+                </div>
+
+                <div class="col-md-4 d-flex gap-2">
+                    <button type="submit" class="btn btn-sm btn-primary">
+                        <i class="bi bi-search me-1"></i>Filter
+                    </button>
+
+                    <a href="{{ route('traffic-sentinel.ips.index') }}" class="btn btn-sm btn-outline-secondary">
+                        Reset
+                    </a>
+                </div>
+            </form>
+        </div>
 
         <div class="table-responsive">
             <table class="table ts-table table-hover mb-0 align-middle" id="ipsTable">

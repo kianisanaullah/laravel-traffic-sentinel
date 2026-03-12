@@ -13,6 +13,10 @@ class IpRuleController extends Controller
     {
         $limitDate = now()->subDays(15);
 
+        $ipFilter = trim((string) $request->get('ip', ''));
+        $typeFilter = trim((string) $request->get('type', ''));
+        $statusFilter = trim((string) $request->get('status', ''));
+
         $humanIps = DB::table('traffic_sessions_humans')
             ->selectRaw("
             ip,
@@ -23,6 +27,9 @@ class IpRuleController extends Controller
             ->whereNotNull('ip')
             ->where('ip', '!=', '')
             ->where('last_seen_at', '>=', $limitDate)
+            ->when($ipFilter !== '', function ($q) use ($ipFilter) {
+                $q->where('ip', 'like', '%' . $ipFilter . '%');
+            })
             ->groupBy('ip');
 
         $botIps = DB::table('traffic_sessions_bots')
@@ -35,6 +42,9 @@ class IpRuleController extends Controller
             ->whereNotNull('ip')
             ->where('ip', '!=', '')
             ->where('last_seen_at', '>=', $limitDate)
+            ->when($ipFilter !== '', function ($q) use ($ipFilter) {
+                $q->where('ip', 'like', '%' . $ipFilter . '%');
+            })
             ->groupBy('ip');
 
         $ips = DB::query()
@@ -53,16 +63,38 @@ class IpRuleController extends Controller
             END as traffic_type
         ")
             ->groupBy('ip')
+            ->when(in_array($typeFilter, ['human', 'bot', 'mixed'], true), function ($q) use ($typeFilter) {
+                $q->having('traffic_type', '=', $typeFilter);
+            })
             ->orderByDesc('sessions')
-            ->paginate(50);
+            ->paginate(50)
+            ->withQueryString();
+
+        $pageIps = collect($ips->items())->pluck('ip')->filter()->values();
 
         $rules = DB::table('traffic_bot_rules')
             ->whereNotNull('ip')
             ->where('ip', '!=', '')
-            ->whereIn('ip', $ips->pluck('ip'))
+            ->whereIn('ip', $pageIps)
             ->select('ip', 'action', 'limit_per_minute', 'limit_per_hour', 'limit_per_day')
             ->get()
             ->keyBy('ip');
+
+        if ($statusFilter !== '') {
+            $ips->setCollection(
+                $ips->getCollection()->filter(function ($row) use ($rules, $statusFilter) {
+                    $rule = $rules[$row->ip] ?? null;
+
+                    $status = !$rule
+                        ? 'unconfigured'
+                        : ($rule->action === 'block'
+                            ? 'block'
+                            : ($rule->action === 'throttle' ? 'throttle' : 'monitor'));
+
+                    return $status === $statusFilter;
+                })->values()
+            );
+        }
 
         return view('traffic-sentinel::ips.index', compact('ips', 'rules'));
     }

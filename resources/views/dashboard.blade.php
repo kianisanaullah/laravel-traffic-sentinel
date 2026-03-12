@@ -566,6 +566,18 @@
                         <i class="bi bi-robot me-1"></i>Bots
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link @if(request()->routeIs('traffic-sentinel.bots.*')) active @endif"
+                       href="{{ route('traffic-sentinel.bots.index',  ['app' => $qApp, 'host' => $qHost, 'range' => $qRange]) }}">
+                        <i class="bi bi-robot me-1"></i>Bots
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link @if(request()->routeIs('traffic-sentinel.ips.*')) active @endif"
+                       href="{{ route('traffic-sentinel.ips.index', ['app' => $qApp, 'host' => $qHost, 'range' => $qRange]) }}">
+                        <i class="bi bi-geo-alt me-1"></i>IPs
+                    </a>
+                </li>
             </ul>
         </div>
 
