@@ -6,6 +6,12 @@ use Illuminate\Support\Facades\DB;
 
 class BotProtectionService
 {
+    protected function db()
+    {
+        return \DB::connection(
+            config('traffic-sentinel.database.connection', config('database.default'))
+        );
+    }
     public function check($botName = null, $ip = null, $host = null, $app = null)
     {
         $rule = $this->getIpRule($ip);
@@ -37,7 +43,7 @@ class BotProtectionService
             return null;
         }
 
-        return DB::table('traffic_bot_rules')
+        return $this->db()->table('traffic_bot_rules')
             ->where('enabled', true)
             ->where('ip', $ip)
             ->first();
@@ -49,7 +55,7 @@ class BotProtectionService
             return null;
         }
 
-        return DB::table('traffic_bot_rules')
+        return $this->db()->table('traffic_bot_rules')
             ->where('enabled', true)
             ->where('bot_name', $botName)
             ->first();
@@ -61,7 +67,7 @@ class BotProtectionService
             return null;
         }
 
-        return DB::table('traffic_bot_rules')
+        return $this->db()->table('traffic_bot_rules')
             ->where('enabled', true)
             ->where('host', $host)
             ->first();
@@ -73,7 +79,7 @@ class BotProtectionService
             return null;
         }
 
-        return DB::table('traffic_bot_rules')
+        return $this->db()->table('traffic_bot_rules')
             ->where('enabled', true)
             ->where('app_key', $app)
             ->first();

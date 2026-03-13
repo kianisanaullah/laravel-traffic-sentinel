@@ -6,9 +6,16 @@ use Illuminate\Support\Facades\DB;
 
 class BotRuleService
 {
+    protected function db()
+    {
+        return \DB::connection(
+            config('traffic-sentinel.database.connection', config('database.default'))
+        );
+    }
+
     public function blockBot($botName)
     {
-        DB::table('traffic_bot_rules')->updateOrInsert(
+        $this->db()->table('traffic_bot_rules')->updateOrInsert(
             ['bot_name' => $botName],
             [
                 'action' => 'block',
@@ -22,7 +29,7 @@ class BotRuleService
 
     public function throttleBot($botName, $rpm = 60)
     {
-        DB::table('traffic_bot_rules')->updateOrInsert(
+        $this->db()->table('traffic_bot_rules')->updateOrInsert(
             ['bot_name' => $botName],
             [
                 'action' => 'throttle',
@@ -34,7 +41,7 @@ class BotRuleService
 
     public function monitorBot($botName)
     {
-        DB::table('traffic_bot_rules')->updateOrInsert(
+        $this->db()->table('traffic_bot_rules')->updateOrInsert(
             ['bot_name' => $botName],
             [
                 'action' => 'monitor',
@@ -45,7 +52,7 @@ class BotRuleService
     }
     public function blockIp(string $ip): void
     {
-        DB::table('traffic_bot_rules')->updateOrInsert(
+        $this->db()->table('traffic_bot_rules')->updateOrInsert(
             ['ip' => $ip],
             [
                 'action' => 'block',
@@ -61,7 +68,7 @@ class BotRuleService
 
     public function throttleIp(string $ip, ?int $perMinute = null, ?int $perHour = null, ?int $perDay = null): void
     {
-        DB::table('traffic_bot_rules')->updateOrInsert(
+        $this->db()->table('traffic_bot_rules')->updateOrInsert(
             ['ip' => $ip],
             [
                 'action' => 'throttle',
@@ -77,7 +84,7 @@ class BotRuleService
 
     public function monitorIp(string $ip): void
     {
-        DB::table('traffic_bot_rules')->updateOrInsert(
+        $this->db()->table('traffic_bot_rules')->updateOrInsert(
             ['ip' => $ip],
             [
                 'action' => 'monitor',

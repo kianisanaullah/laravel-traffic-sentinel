@@ -7,9 +7,16 @@ use Carbon\Carbon;
 
 class BotTrafficService
 {
+    protected function db()
+    {
+        return \DB::connection(
+            config('traffic-sentinel.database.connection', config('database.default'))
+        );
+    }
+
     public function botsLastMinutes($minutes = 5)
     {
-        return DB::table('traffic_pageviews_bots')
+        return $this->db()->table('traffic_pageviews_bots')
             ->where('viewed_at', '>=', Carbon::now()->subMinutes($minutes))
             ->selectRaw('bot_name, COUNT(*) as hits')
             ->groupBy('bot_name')
@@ -19,7 +26,7 @@ class BotTrafficService
 
     public function requestsPerMinute($botName)
     {
-        return DB::table('traffic_pageviews_bots')
+        return $this->db()->table('traffic_pageviews_bots')
             ->where('bot_name', $botName)
             ->where('viewed_at', '>=', now()->subMinute())
             ->count();
@@ -27,7 +34,7 @@ class BotTrafficService
 
     public function requestsPerHour($botName)
     {
-        return DB::table('traffic_pageviews_bots')
+        return $this->db()->table('traffic_pageviews_bots')
             ->where('bot_name', $botName)
             ->where('viewed_at', '>=', now()->subHour())
             ->count();
