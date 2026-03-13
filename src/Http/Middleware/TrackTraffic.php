@@ -5,6 +5,7 @@ namespace Kianisanaullah\TrafficSentinel\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Kianisanaullah\TrafficSentinel\Services\TrafficTracker;
 use Kianisanaullah\TrafficSentinel\Services\Bots\BotProtectionService;
@@ -44,6 +45,18 @@ class TrackTraffic
 
         [$isBot, $botName] = $tracker->detectBotFromRequest($request);
 
+        /*
+        |--------------------------------------------------------------------------
+        | GLOBAL MONITORING (EVERY IP)
+        |--------------------------------------------------------------------------
+        */
+        $this->monitorEveryIp($ipStored, $botName, $host);
+
+        /*
+        |--------------------------------------------------------------------------
+        | RULE-BASED PROTECTION
+        |--------------------------------------------------------------------------
+        */
         $rule = $protection->check($botName, $ipStored, $host, $app);
 
         if ($rule) {
@@ -60,16 +73,20 @@ class TrackTraffic
 
         $response = $next($request);
 
-        $durationMs = (int)round((microtime(true) - $start) * 1000);
+        $durationMs = (int) round((microtime(true) - $start) * 1000);
 
         if ($isNewVisitorId) {
             $this->attachVisitorCookie($request, $response, $visitorId);
         }
 
         try {
-            $status = method_exists($response, 'getStatusCode') ? (int)$response->getStatusCode() : null;
+
+            $status = method_exists($response, 'getStatusCode')
+                ? (int)$response->getStatusCode()
+                : null;
 
             if ($status !== null) {
+
                 if (!config('traffic-sentinel.track_redirects', true) && $status >= 300 && $status < 400) {
                     return $response;
                 }
@@ -80,16 +97,65 @@ class TrackTraffic
             }
 
             $tracker->track($request, $durationMs, $status, $visitorId);
+
         } catch (\Throwable $e) {
+
             \Log::error('TrafficSentinel track failed', [
                 'msg' => $e->getMessage(),
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
             ]);
+
         }
 
         return $response;
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | GLOBAL IP MONITORING
+    |--------------------------------------------------------------------------
+    */
+
+    private function monitorEveryIp(?string $ipStored, ?string $botName, ?string $host): void
+    {
+        if (!config('traffic-sentinel.alerts.enabled')) {
+            return;
+        }
+
+        if (!$ipStored) {
+            return;
+        }
+
+        $threshold = (int) config('traffic-sentinel.alerts.threshold', 0);
+        $window = (int) config('traffic-sentinel.alerts.window_seconds', 60);
+
+        if ($threshold <= 0 || $window <= 0) {
+            return;
+        }
+
+        $key = 'ts_alert_monitor_ip:' . $ipStored;
+
+        if (!Cache::has($key)) {
+            Cache::put($key, 0, now()->addSeconds($window));
+        }
+
+        $hits = Cache::increment($key);
+
+        $this->maybeAlertAdmin([
+            'key' => $key,
+            'hits' => $hits,
+            'ip' => $ipStored,
+            'bot_name' => $botName,
+            'host' => $host,
+        ]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | THROTTLE RULES
+    |--------------------------------------------------------------------------
+    */
 
     private function enforceThrottle(?string $ipStored, ?string $botName, ?string $host, ?string $app, $rule): void
     {
@@ -100,39 +166,28 @@ class TrackTraffic
         }
 
         if (!empty($rule->limit_per_minute)) {
-            $this->checkThrottleWindow(
-                $baseKey . ':min',
-                (int)$rule->limit_per_minute,
-                60,
-                'Too many requests per minute',
-                $ipStored,
-                $botName,
-                $host
-            );
+            $this->checkThrottleWindow($baseKey . ':min', (int)$rule->limit_per_minute, 60, 'Too many requests per minute');
         }
 
         if (!empty($rule->limit_per_hour)) {
-            $this->checkThrottleWindow(
-                $baseKey . ':hour',
-                (int)$rule->limit_per_hour,
-                3600,
-                'Too many requests per hour',
-                $ipStored,
-                $botName,
-                $host
-            );
+            $this->checkThrottleWindow($baseKey . ':hour', (int)$rule->limit_per_hour, 3600, 'Too many requests per hour');
         }
 
         if (!empty($rule->limit_per_day)) {
-            $this->checkThrottleWindow(
-                $baseKey . ':day',
-                (int)$rule->limit_per_day,
-                86400,
-                'Too many requests per day',
-                $ipStored,
-                $botName,
-                $host
-            );
+            $this->checkThrottleWindow($baseKey . ':day', (int)$rule->limit_per_day, 86400, 'Too many requests per day');
+        }
+    }
+
+    private function checkThrottleWindow(string $key, int $limit, int $ttlSeconds, string $message): void
+    {
+        if (!Cache::has($key)) {
+            Cache::put($key, 0, now()->addSeconds($ttlSeconds));
+        }
+
+        $hits = Cache::increment($key);
+
+        if ($hits > $limit) {
+            abort(429, $message);
         }
     }
 
@@ -157,10 +212,82 @@ class TrackTraffic
         return $ipStored ? 'ts_rate_ip:' . $ipStored : null;
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | ALERT EMAIL
+    |--------------------------------------------------------------------------
+    */
+
+    private function maybeAlertAdmin(array $data): void
+    {
+        if (!config('traffic-sentinel.alerts.enabled')) {
+            return;
+        }
+
+        $threshold = (int) config('traffic-sentinel.alerts.threshold');
+
+        $emails = collect(explode(',', (string) config('traffic-sentinel.alerts.email', '')))
+            ->map(fn($e) => trim($e))
+            ->filter()
+            ->values()
+            ->all();
+
+        if ($threshold <= 0 || empty($emails)) {
+            return;
+        }
+
+        if (($data['hits'] ?? 0) < $threshold) {
+            return;
+        }
+
+        $alertKey = 'ts_alert_sent:' . ($data['key'] ?? 'unknown');
+
+        if (Cache::has($alertKey)) {
+            return;
+        }
+
+        Cache::put($alertKey, true, now()->addMinutes(10));
+
+        try {
+
+            $trafficType = !empty($data['bot_name']) ? 'Bot' : 'Human';
+
+            Mail::send(
+                'traffic-sentinel::emails.high-traffic-alert',
+                [
+                    'ip' => $data['ip'] ?? null,
+                    'hits' => $data['hits'] ?? 0,
+                    'trafficType' => $trafficType,
+                    'botName' => $data['bot_name'] ?? null,
+                    'host' => $data['host'] ?? null,
+                    'time' => now(),
+                ],
+                function ($msg) use ($emails, $data) {
+
+                    $msg->to($emails)
+                        ->subject('🚨 Traffic Sentinel Alert — High Traffic from IP ' . ($data['ip'] ?? 'unknown'));
+
+                }
+            );
+
+        } catch (\Throwable $e) {
+
+            \Log::error('TrafficSentinel alert email failed', [
+                'error' => $e->getMessage(),
+            ]);
+
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | VISITOR COOKIE
+    |--------------------------------------------------------------------------
+    */
 
     protected function getOrCreateVisitorId(Request $request): array
     {
-        $cookieName = (string)config('traffic-sentinel.cookie.name', 'ts_vid');
+        $cookieName = config('traffic-sentinel.cookie.name', 'ts_vid');
         $visitorId = (string)$request->cookie($cookieName);
 
         if ($visitorId === '' || strlen($visitorId) > 80) {
@@ -173,26 +300,18 @@ class TrackTraffic
 
     protected function attachVisitorCookie(Request $request, $response, string $visitorId): void
     {
-        $cookieName = (string)config('traffic-sentinel.cookie.name', 'ts_vid');
-        $minutes = (int)config('traffic-sentinel.cookie.minutes', 60 * 24 * 365 * 2);
-        $path = (string)config('traffic-sentinel.cookie.path', '/');
-        $domain = config('traffic-sentinel.cookie.domain', null);
-        $httpOnly = (bool)config('traffic-sentinel.cookie.http_only', true);
-        $sameSite = (string)config('traffic-sentinel.cookie.same_site', 'Lax');
-
-        $secure = config('traffic-sentinel.cookie.secure', null);
-        $secure = $secure === null ? $request->isSecure() : (bool)$secure;
+        $cookieName = config('traffic-sentinel.cookie.name', 'ts_vid');
 
         $cookie = cookie(
             $cookieName,
             $visitorId,
-            $minutes,
-            $path,
-            $domain,
-            $secure,
-            $httpOnly,
+            config('traffic-sentinel.cookie.minutes', 60 * 24 * 365 * 2),
+            config('traffic-sentinel.cookie.path', '/'),
+            config('traffic-sentinel.cookie.domain', null),
+            $request->isSecure(),
+            true,
             false,
-            $sameSite
+            config('traffic-sentinel.cookie.same_site', 'Lax')
         );
 
         if (method_exists($response, 'headers')) {
@@ -200,23 +319,27 @@ class TrackTraffic
         }
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | EXCLUSIONS
+    |--------------------------------------------------------------------------
+    */
+
     protected function shouldExclude(Request $request): bool
     {
         $cfg = config('traffic-sentinel.exclude', []);
 
         $host = strtolower((string)$request->getHost());
         foreach (($cfg['hosts'] ?? []) as $h) {
-            $h = strtolower(trim($h));
-            if ($h !== '' && $host === $h) return true;
+            if ($host === strtolower(trim($h))) return true;
         }
 
         $path = ltrim($request->path(), '/');
         foreach (($cfg['paths'] ?? []) as $p) {
-            $p = trim($p, '/');
-            if ($p !== '' && str_starts_with($path, $p)) return true;
+            if ($p !== '' && str_starts_with($path, trim($p, '/'))) return true;
         }
 
-        $ip = (string)$request->ip();
+        $ip = $request->ip();
         foreach (($cfg['ips'] ?? []) as $blocked) {
             if ($blocked === $ip) return true;
         }
@@ -246,101 +369,6 @@ class TrackTraffic
     {
         if ($request->hasHeader('x-livewire')) return true;
 
-        $path = ltrim((string)$request->path(), '/');
-        return str_starts_with($path, 'livewire/');
-    }
-
-
-    private function checkThrottleWindow(
-        string  $key,
-        int     $limit,
-        int     $ttlSeconds,
-        string  $message,
-        ?string $ip = null,
-        ?string $botName = null,
-        ?string $host = null
-    ): void
-    {
-        if (!Cache::has($key)) {
-            Cache::put($key, 0, now()->addSeconds($ttlSeconds));
-        }
-
-        $hits = Cache::increment($key);
-
-        $this->maybeAlertAdmin([
-            'key' => $key,
-            'hits' => $hits,
-            'ip' => $ip,
-            'bot_name' => $botName,
-            'host' => $host,
-        ]);
-
-        if ($hits > $limit) {
-            abort(429, $message);
-        }
-    }
-
-    private function maybeAlertAdmin(array $data): void
-    {
-        if (!config('traffic-sentinel.alerts.enabled')) {
-            return;
-        }
-
-        $threshold = (int)config('traffic-sentinel.alerts.threshold');
-        $email = trim((string)config('traffic-sentinel.alerts.email', ''));
-
-        if ($threshold <= 0 || $email === '') {
-            return;
-        }
-
-        if (($data['hits'] ?? 0) < $threshold) {
-            return;
-        }
-
-        $mailConfigured =
-            config('mail.default') &&
-            (
-                config('mail.mailers.smtp.host') ||
-                config('mail.mailers.ses.key') ||
-                config('mail.mailers.mailgun.domain') ||
-                config('mail.mailers.log')
-            );
-
-        if (!$mailConfigured) {
-            \Log::warning('TrafficSentinel alert skipped: mail is not configured.');
-            return;
-        }
-
-        $alertKey = 'ts_alert_sent:' . ($data['key'] ?? 'unknown');
-
-        if (cache()->has($alertKey)) {
-            return;
-        }
-
-        cache()->put($alertKey, true, now()->addMinutes(10));
-
-        try {
-            $trafficType = !empty($data['bot_name']) ? 'Bot' : 'Human';
-
-            \Mail::send(
-                'traffic-sentinel::emails.high-traffic-alert',
-                [
-                    'ip' => $data['ip'] ?? null,
-                    'hits' => $data['hits'] ?? 0,
-                    'trafficType' => $trafficType,
-                    'botName' => $data['bot_name'] ?? null,
-                    'host' => $data['host'] ?? null,
-                    'time' => now(),
-                ],
-                function ($msg) use ($email, $data) {
-                    $msg->to($email)
-                    ->subject('🚨 Traffic Sentinel Alert — High Traffic from IP ' . ($data['ip'] ?? 'unknown'));
-                }
-            );
-        } catch (\Throwable $e) {
-            \Log::error('TrafficSentinel alert email failed', [
-                'error' => $e->getMessage(),
-            ]);
-        }
+        return str_starts_with(ltrim((string)$request->path(), '/'), 'livewire/');
     }
 }
