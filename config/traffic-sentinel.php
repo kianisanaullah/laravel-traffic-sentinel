@@ -257,4 +257,16 @@ return [
         'keep_days' => 120,
     ],
 
+    'alerts' => [
+
+        'enabled' => env('TRAFFIC_SENTINEL_ALERTS', true),
+
+        'threshold' => env('TRAFFIC_SENTINEL_ALERT_THRESHOLD', 200),
+
+        'window_seconds' => env('TRAFFIC_SENTINEL_ALERT_WINDOW', 60),
+
+        'email' => env('TRAFFIC_SENTINEL_ALERT_EMAIL'),
+
+    ],
+
 ];

@@ -133,18 +133,6 @@ class TrackTraffic
         return $ipStored ? 'ts_rate_ip:' . $ipStored : null;
     }
 
-    private function checkThrottleWindow(string $key, int $limit, int $ttlSeconds, string $message): void
-    {
-        if (!Cache::has($key)) {
-            Cache::put($key, 0, now()->addSeconds($ttlSeconds));
-        }
-
-        $hits = Cache::increment($key);
-
-        if ($hits > $limit) {
-            abort(429, $message);
-        }
-    }
 
     protected function getOrCreateVisitorId(Request $request): array
     {
@@ -236,5 +224,82 @@ class TrackTraffic
 
         $path = ltrim((string) $request->path(), '/');
         return str_starts_with($path, 'livewire/');
+    }
+    private function checkThrottleWindow(string $key, int $limit, int $ttlSeconds, string $message): void
+    {
+        if (!Cache::has($key)) {
+            Cache::put($key, 0, now()->addSeconds($ttlSeconds));
+        }
+
+        $hits = Cache::increment($key);
+
+        $this->maybeAlertAdmin($key, $hits);
+
+        if ($hits > $limit) {
+            abort(429, $message);
+        }
+    }
+    private function maybeAlertAdmin(array $data): void
+    {
+        if (!config('traffic-sentinel.alerts.enabled')) {
+            return;
+        }
+
+        $threshold = (int) config('traffic-sentinel.alerts.threshold');
+        $email = trim((string) config('traffic-sentinel.alerts.email', ''));
+
+        if ($threshold <= 0 || $email === '') {
+            return;
+        }
+
+        if (($data['hits'] ?? 0) < $threshold) {
+            return;
+        }
+
+        $mailConfigured =
+            config('mail.default') &&
+            (
+                config('mail.mailers.smtp.host') ||
+                config('mail.mailers.ses.key') ||
+                config('mail.mailers.mailgun.domain') ||
+                config('mail.mailers.log')
+            );
+
+        if (!$mailConfigured) {
+            \Log::warning('TrafficSentinel alert skipped: mail is not configured.');
+            return;
+        }
+
+        $alertKey = 'ts_alert_sent:' . ($data['key'] ?? 'unknown');
+
+        if (cache()->has($alertKey)) {
+            return;
+        }
+
+        cache()->put($alertKey, true, now()->addMinutes(10));
+
+        try {
+            $trafficType = !empty($data['bot_name']) ? 'Bot' : 'Human';
+
+            \Mail::send(
+                'traffic-sentinel::emails.high-traffic-alert',
+                [
+                    'ip' => $data['ip'] ?? null,
+                    'hits' => $data['hits'] ?? 0,
+                    'trafficType' => $trafficType,
+                    'botName' => $data['bot_name'] ?? null,
+                    'host' => $data['host'] ?? null,
+                    'time' => now(),
+                ],
+                function ($msg) use ($email, $data) {
+                    $msg->to($email)
+                        ->subject('🚨 Traffic Sentinel Alert — High Traffic from IP' . ($data['ip'] ?? 'unknown'));
+                }
+            );
+        } catch (\Throwable $e) {
+            \Log::error('TrafficSentinel alert email failed', [
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 }
