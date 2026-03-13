@@ -15,6 +15,13 @@ use Kianisanaullah\TrafficSentinel\Models\TrafficSessionHuman;
 
 class TrafficTracker
 {
+    protected function db()
+    {
+        return \DB::connection(
+            config('traffic-sentinel.database.connection', config('database.default'))
+        );
+    }
+
     public function track(Request $request, int $durationMs, ?int $statusCode, ?string $visitorId = null): void
     {
         if (! $this->shouldTrackBasic($request)) return;
@@ -25,7 +32,7 @@ class TrafficTracker
         $ua = (string) $request->userAgent();
         $ipStored = $this->ipToStore($request->ip());
 
-        $blocked = DB::table('traffic_bot_blocks')
+        $blocked = $this->db()->table('traffic_bot_blocks')
             ->where('ip', $ipStored)
             ->where(function ($q) {
                 $q->whereNull('blocked_until')
