@@ -175,7 +175,7 @@
 
             <div class="actions">
 
-                <a href="{{ url('/traffic-sentinel/ips/block?ip='.$ip) }}" class="button btn-block text-white">
+                <a href="{{ url('/admin/traffic-sentinel/ips/block?ip='.$ip) }}" class="button btn-block text-white">
                     Block IP
                 </a>
 
