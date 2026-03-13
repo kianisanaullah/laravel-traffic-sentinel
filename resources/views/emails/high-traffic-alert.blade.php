@@ -175,8 +175,21 @@
 
             <div class="actions">
 
-                <a href="{{ url('/admin/traffic-sentinel/ips/block?ip='.$ip) }}" class="button btn-block text-white">
-                    Block IP
+                @php
+                    $ipUrl = url('/admin/traffic-sentinel/ips?ip=' . $ip . '&type=&status=');
+                @endphp
+
+                <a href="{{ $ipUrl }}"
+                   style="
+      display:inline-block;
+      padding:10px 16px;
+      background:#dc3545;
+      color:white;
+      text-decoration:none;
+      border-radius:6px;
+      font-weight:600;
+   ">
+                    🚫 Review / Block IP
                 </a>
 
             </div>
