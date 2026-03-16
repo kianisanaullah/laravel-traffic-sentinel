@@ -25,29 +25,33 @@ class BotController extends Controller
 
         $limitDate = now()->subDays($days);
 
-        $bots = DB::table('traffic_sessions_bots')
-            ->selectRaw('
-            COALESCE(bot_name, "unknown") as bot_name,
+        $base = DB::table('traffic_sessions_bots')
+            ->where('last_seen_at', '>=', $limitDate)
+            ->when($q !== '', function ($query) use ($q) {
+                $query->where('bot_name', 'like', "%{$q}%");
+            });
+
+        $bots = DB::query()
+            ->fromSub(
+                $base->selectRaw("
+                COALESCE(bot_name,'unknown') as bot_name,
+                ip,
+                last_seen_at
+            "),
+                't'
+            )
+            ->selectRaw("
+            bot_name,
             COUNT(*) as sessions,
             COUNT(DISTINCT ip) as ips,
             MAX(last_seen_at) as last_seen
-        ')
-            ->where('last_seen_at', '>=', $limitDate)
-            ->when($q !== '', function ($query) use ($q) {
-                $query->where(function ($sub) use ($q) {
-                    $sub->where('bot_name', 'like', '%' . $q . '%')
-                        ->orWhereNull('bot_name');
-                });
-            })
+        ")
             ->groupBy('bot_name')
             ->orderByDesc('sessions')
             ->paginate(50)
             ->withQueryString();
 
-        $botNames = collect($bots->items())
-            ->pluck('bot_name')
-            ->filter()
-            ->values();
+        $botNames = $bots->pluck('bot_name');
 
         $rules = DB::table('traffic_bot_rules')
             ->whereIn('bot_name', $botNames)
@@ -64,6 +68,7 @@ class BotController extends Controller
         if ($statusFilter !== '') {
             $bots->setCollection(
                 $bots->getCollection()->filter(function ($bot) use ($rules, $statusFilter) {
+
                     $rule = $rules[$bot->bot_name] ?? null;
 
                     $status = !$rule
@@ -73,6 +78,7 @@ class BotController extends Controller
                             : ($rule->action === 'throttle' ? 'throttle' : 'monitor'));
 
                     return $status === $statusFilter;
+
                 })->values()
             );
         }
