@@ -44,10 +44,6 @@ class CaptchaController extends Controller
         );
 
         $result = $response->json();
-        \Log::info('TURNSTILE VERIFY RESPONSE', [
-            'response' => $result,
-            'token' => $request->input('cf-turnstile-response')
-        ]);
 
         $ipStored = $tracker->ipForStorage($request->ip());
 
