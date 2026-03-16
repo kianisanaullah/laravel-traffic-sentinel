@@ -104,39 +104,17 @@
                 <input type="hidden" name="redirect_to" value="{{ $redirectTo }}">
 
                 <div class="cf-turnstile"
-                     data-sitekey="{{ $turnstileSiteKey }}"
-                     data-callback="turnstileSuccess"
-                     data-response-field-name="cf-turnstile-response">
+                     data-sitekey="{{ $turnstileSiteKey }}">
                 </div>
 
                 <div class="actions">
-                    <button id="verify-btn" type="submit" class="btn" disabled>
-                        Verifying...
+                    <button type="submit" class="btn">
+                        Continue
                     </button>
                 </div>
 
             </form>
 
-            <script>
-                function turnstileSuccess(token) {
-
-                    if(!token) {
-                        return;
-                    }
-
-                    const form = document.querySelector('form');
-
-                    if(!form.querySelector('[name="cf-turnstile-response"]')){
-                        const input = document.createElement('input');
-                        input.type = 'hidden';
-                        input.name = 'cf-turnstile-response';
-                        input.value = token;
-                        form.appendChild(input);
-                    }
-
-                    form.submit();
-                }
-            </script>
             <div class="muted">
                 Traffic Sentinel protection is active on this site.
             </div>
