@@ -105,7 +105,8 @@
 
                 <div class="cf-turnstile"
                      data-sitekey="{{ $turnstileSiteKey }}"
-                     data-callback="turnstileSuccess">
+                     data-callback="turnstileSuccess"
+                     data-response-field-name="cf-turnstile-response">
                 </div>
 
                 <div class="actions">
@@ -119,11 +120,21 @@
             <script>
                 function turnstileSuccess(token) {
 
-                    const btn = document.getElementById('verify-btn');
+                    if(!token) {
+                        return;
+                    }
 
-                    btn.disabled = false;
-                    btn.innerText = "Continue";
+                    const form = document.querySelector('form');
 
+                    if(!form.querySelector('[name="cf-turnstile-response"]')){
+                        const input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = 'cf-turnstile-response';
+                        input.value = token;
+                        form.appendChild(input);
+                    }
+
+                    form.submit();
                 }
             </script>
             <div class="muted">
