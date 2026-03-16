@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\DB;
 use Kianisanaullah\TrafficSentinel\Services\Bots\BotRuleService;
+use Kianisanaullah\TrafficSentinel\Services\RuntimeIpLookupService;
 
 class IpRuleController extends Controller
 {

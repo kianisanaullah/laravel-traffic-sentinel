@@ -71,7 +71,7 @@
                     <th style="width:180px">Last Seen</th>
                     <th style="width:220px">Status</th>
                     <th style="width:100px">Focus</th>
-                    <th style="min-width:360px">Actions</th>
+                    <th style="min-width:50px">Actions</th>
                 </tr>
                 </thead>
 
