@@ -70,7 +70,7 @@
                     <th style="width:120px">Sessions</th>
                     <th style="width:180px">Last Seen</th>
                     <th style="width:220px">Status</th>
-                    <th style="width:100px">Focus</th>
+                    <th style="width:300px">Focus</th>
                     <th style="min-width:50px">Actions</th>
                 </tr>
                 </thead>
