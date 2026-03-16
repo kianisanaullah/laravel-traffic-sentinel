@@ -15,24 +15,58 @@
 
             <div class="row g-3">
 
+                {{-- IP --}}
                 <div class="col-lg-3 col-md-6">
-                    <div class="ts-badge">IP</div>
-                    <div class="fw-semibold">{{ $ip }}</div>
+                    <div class="ts-badge mb-1">IP Address</div>
+                    <div class="fw-semibold">
+                        @include('traffic-sentinel::partials.ip-cell', ['ip'=>$ip])
+                    </div>
                 </div>
 
+                {{-- Country --}}
                 <div class="col-lg-3 col-md-6">
-                    <div class="ts-badge">Country</div>
-                    <div>{{ $geo['country'] ?? 'Unknown' }}</div>
+                    <div class="ts-badge mb-1">Country</div>
+                    <div class="fw-semibold">
+
+                        @if(!empty($geo['country_name']))
+                            {{ $geo['flag'] ?? '' }}
+                            {{ $geo['country_name'] }}
+                            <span class="text-muted small">
+                            ({{ $geo['country_code'] ?? '' }})
+                        </span>
+                        @else
+                            <span class="text-muted">Unknown</span>
+                        @endif
+
+                    </div>
                 </div>
 
+                {{-- ASN --}}
                 <div class="col-lg-3 col-md-6">
-                    <div class="ts-badge">City</div>
-                    <div>{{ $geo['city'] ?? 'Unknown' }}</div>
+                    <div class="ts-badge mb-1">ASN</div>
+                    <div class="fw-semibold">
+
+                        @if(!empty($geo['asn']))
+                            AS{{ $geo['asn'] }}
+                        @else
+                            <span class="text-muted">Unknown</span>
+                        @endif
+
+                    </div>
                 </div>
 
+                {{-- ISP --}}
                 <div class="col-lg-3 col-md-6">
-                    <div class="ts-badge">ISP</div>
-                    <div>{{ $geo['isp'] ?? 'Unknown' }}</div>
+                    <div class="ts-badge mb-1">Network / ISP</div>
+                    <div class="fw-semibold">
+
+                        @if(!empty($geo['asn_name']))
+                            {{ $geo['asn_name'] }}
+                        @else
+                            <span class="text-muted">Unknown</span>
+                        @endif
+
+                    </div>
                 </div>
 
             </div>
