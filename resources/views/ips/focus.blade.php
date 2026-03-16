@@ -13,24 +13,24 @@
 
         <div class="p-3">
 
-            <div class="row">
+            <div class="row g-3">
 
-                <div class="col-md-3">
+                <div class="col-lg-3 col-md-6">
                     <div class="ts-badge">IP</div>
                     <div class="fw-semibold">{{ $ip }}</div>
                 </div>
 
-                <div class="col-md-3">
+                <div class="col-lg-3 col-md-6">
                     <div class="ts-badge">Country</div>
                     <div>{{ $geo['country'] ?? 'Unknown' }}</div>
                 </div>
 
-                <div class="col-md-3">
+                <div class="col-lg-3 col-md-6">
                     <div class="ts-badge">City</div>
                     <div>{{ $geo['city'] ?? 'Unknown' }}</div>
                 </div>
 
-                <div class="col-md-3">
+                <div class="col-lg-3 col-md-6">
                     <div class="ts-badge">ISP</div>
                     <div>{{ $geo['isp'] ?? 'Unknown' }}</div>
                 </div>
@@ -144,24 +144,54 @@
     </div>
 
 
+
     <div class="ts-card">
 
-        <div class="p-3 border-bottom">
-            <strong>Visited Pages</strong>
+        <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+
+            <strong>
+                Visited Pages
+            </strong>
+
+            <span class="ts-badge">
+{{ $visits->total() }} Requests
+</span>
+
         </div>
+
 
         <div class="table-responsive">
 
-            <table class="table ts-table mb-0">
+            <table class="table ts-table table-hover align-middle mb-0">
 
                 <thead>
+
                 <tr>
-                    <th>Time</th>
-                    <th>Type</th>
-                    <th>URL</th>
-                    <th>User Agent</th>
+
+                    <th style="width:150px">Time</th>
+
+                    <th style="width:80px">Type</th>
+
+                    <th style="width:70px">Method</th>
+
+                    <th>Path</th>
+
+                    <th style="width:90px">Status</th>
+
+                    <th style="width:110px">Duration</th>
+
+                    <th>Route</th>
+
+                    <th>Referrer</th>
+
+                    <th style="width:180px">Session</th>
+
+                    <th style="width:160px">User/Bot</th>
+
                 </tr>
+
                 </thead>
+
 
                 <tbody>
 
@@ -169,29 +199,131 @@
 
                     <tr>
 
-                        <td>
-                            {{ \Carbon\Carbon::parse($visit->last_seen_at)->format('Y-m-d H:i:s') }}
+                        <td class="small text-nowrap">
+                            {{ \Carbon\Carbon::parse($visit->viewed_at)->format('Y-m-d H:i:s') }}
                         </td>
 
+
                         <td>
-                            @if($visit->type == 'bot')
+
+                            @if($visit->type === 'bot')
+
                                 <span class="ts-badge bg-warning text-dark">
-                                Bot
-                            </span>
+<i class="bi bi-robot me-1"></i>
+Bot
+</span>
+
                             @else
+
                                 <span class="ts-badge bg-primary">
-                                Human
-                            </span>
+<i class="bi bi-person me-1"></i>
+Human
+</span>
+
                             @endif
+
                         </td>
+
+
+                        <td>
+<span class="ts-pill">
+{{ $visit->method }}
+</span>
+                        </td>
+
 
                         <td class="text-break">
-                            {{ $visit->url }}
+
+                            <div class="fw-semibold small">
+                                {{ $visit->path }}
+                            </div>
+
+                            @if($visit->full_url)
+                                <div class="text-muted small">
+                                    {{ $visit->full_url }}
+                                </div>
+                            @endif
+
                         </td>
 
-                        <td class="small text-muted text-break">
-                            {{ $visit->user_agent }}
+
+                        <td>
+
+                            @if($visit->status_code)
+
+                                <span class="ts-pill">
+{{ $visit->status_code }}
+</span>
+
+                            @endif
+
                         </td>
+
+
+                        <td class="small text-muted">
+
+                            @if($visit->duration_ms)
+                                {{ number_format($visit->duration_ms) }} ms
+                            @endif
+
+                        </td>
+
+
+                        <td class="small text-muted text-break">
+                            {{ $visit->route_name ?? '—' }}
+                        </td>
+
+
+                        <td class="small text-break">
+
+                            @if($visit->referrer)
+
+                                <span class="text-muted">
+{{ Str::limit($visit->referrer, 80) }}
+</span>
+
+                            @else
+                                —
+                            @endif
+
+                        </td>
+
+
+                        <td class="small text-muted">
+
+                            @if($visit->session_id)
+                                {{ Str::limit($visit->session_id, 14) }}
+                            @endif
+
+                        </td>
+
+
+                        <td class="small text-break">
+
+                            @if($visit->type === 'bot')
+
+                                <span class="ts-badge bg-warning text-dark">
+{{ $visit->bot_name ?? 'Bot' }}
+</span>
+
+                            @else
+
+                                @if($visit->user_id)
+
+                                    <span class="ts-badge bg-success">
+User #{{ $visit->user_id }}
+</span>
+
+                                @else
+
+                                    Visitor {{ Str::limit($visit->visitor_key, 10) }}
+
+                                @endif
+
+                            @endif
+
+                        </td>
+
 
                     </tr>
 
@@ -203,8 +335,11 @@
 
         </div>
 
-        <div class="p-3">
+
+        <div class="p-3 border-top">
+
             {{ $visits->links('pagination::bootstrap-5') }}
+
         </div>
 
     </div>

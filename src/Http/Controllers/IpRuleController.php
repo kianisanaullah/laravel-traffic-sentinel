@@ -148,35 +148,46 @@ class IpRuleController extends Controller
 
         $limitDate = now()->subDays(15);
 
-        $humanSessions = DB::table('traffic_sessions_humans')
+        // Humans pageviews
+        $humanViews = DB::table('traffic_pageviews_humans')
             ->where('ip', $ip)
-            ->where('last_seen_at', '>=', $limitDate);
-
-        $botSessions = DB::table('traffic_sessions_bots')
-            ->where('ip', $ip)
-            ->where('last_seen_at', '>=', $limitDate);
-
-        $sessions = $humanSessions
+            ->where('viewed_at', '>=', $limitDate)
             ->selectRaw("
             'human' as type,
-            url,
             method,
+            path,
+            full_url,
+            route_name,
+            referrer,
+            user_id,
+            visitor_key,
+            session_id,
             user_agent,
-            last_seen_at
-        ")
-            ->unionAll(
-                $botSessions->selectRaw("
-                'bot' as type,
-                url,
-                method,
-                user_agent,
-                last_seen_at
-            ")
-            );
+            viewed_at
+        ");
 
+        // Bots pageviews
+        $botViews = DB::table('traffic_pageviews_bots')
+            ->where('ip', $ip)
+            ->where('viewed_at', '>=', $limitDate)
+            ->selectRaw("
+            'bot' as type,
+            method,
+            path,
+            full_url,
+            route_name,
+            referrer,
+            user_id,
+            visitor_key,
+            session_id,
+            bot_name as user_agent,
+            viewed_at
+        ");
+
+        // Combine
         $visits = DB::query()
-            ->fromSub($sessions, 's')
-            ->orderByDesc('last_seen_at')
+            ->fromSub($humanViews->unionAll($botViews), 'v')
+            ->orderByDesc('viewed_at')
             ->paginate(50);
 
         $rule = DB::table('traffic_bot_rules')
