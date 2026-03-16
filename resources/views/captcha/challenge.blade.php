@@ -104,11 +104,14 @@
                 <input type="hidden" name="redirect_to" value="{{ $redirectTo }}">
 
                 <div class="cf-turnstile"
-                     data-sitekey="{{ $turnstileSiteKey }}">
+                     data-sitekey="{{ $turnstileSiteKey }}"
+                     data-callback="turnstileSuccess">
                 </div>
 
                 <div class="actions">
-                    <button type="submit" class="btn">Continue</button>
+                    <button type="submit" class="btn" disabled>
+                        Verifying...
+                    </button>
                 </div>
             </form>
 
@@ -118,5 +121,10 @@
         </div>
     </div>
 </div>
+<script>
+    function turnstileSuccess(token) {
+        document.querySelector('form').submit();
+    }
+</script>
 </body>
 </html>
