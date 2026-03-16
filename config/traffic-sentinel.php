@@ -2,7 +2,7 @@
 
 return [
 
-    'enabled' => env('TRAFFIC_SENTINEL_ENABLED', false),
+    'enabled' => env('TRAFFIC_SENTINEL_ENABLED', true),
 
     'track_ajax' => false,
     'track_livewire' => false,
