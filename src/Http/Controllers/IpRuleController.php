@@ -148,7 +148,6 @@ class IpRuleController extends Controller
 
         $limitDate = now()->subDays(15);
 
-        // Humans pageviews
         $humanViews = DB::table('traffic_pageviews_humans')
             ->where('ip', $ip)
             ->where('viewed_at', '>=', $limitDate)
@@ -158,15 +157,16 @@ class IpRuleController extends Controller
             path,
             full_url,
             route_name,
+            status_code,
+            duration_ms,
             referrer,
-            user_id,
-            visitor_key,
             session_id,
-            user_agent,
+            visitor_key,
+            user_id,
+            NULL as bot_name,
             viewed_at
         ");
 
-        // Bots pageviews
         $botViews = DB::table('traffic_pageviews_bots')
             ->where('ip', $ip)
             ->where('viewed_at', '>=', $limitDate)
@@ -176,15 +176,16 @@ class IpRuleController extends Controller
             path,
             full_url,
             route_name,
+            status_code,
+            duration_ms,
             referrer,
-            user_id,
-            visitor_key,
             session_id,
-            bot_name as user_agent,
+            visitor_key,
+            NULL as user_id,
+            bot_name,
             viewed_at
         ");
 
-        // Combine
         $visits = DB::query()
             ->fromSub($humanViews->unionAll($botViews), 'v')
             ->orderByDesc('viewed_at')
