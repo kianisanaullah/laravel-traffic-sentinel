@@ -4,8 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Security Check</title>
+
     <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+
     <style>
+
         body {
             margin: 0;
             font-family: Arial, Helvetica, sans-serif;
@@ -73,53 +76,85 @@
             cursor: pointer;
         }
 
+        .btn:hover {
+            background: #1d4ed8;
+        }
+
         .muted {
             margin-top: 18px;
             font-size: 13px;
             color: #6b7280;
         }
+
     </style>
 </head>
+
+
 <body>
+
 <div class="wrapper">
+
     <div class="card">
+
         <div class="header">
             Security Check
         </div>
 
+
         <div class="body">
+
             <p class="text">
-                We detected unusual activity from your network. Please complete the verification below to continue to the requested page.
+                We detected unusual activity from your network.
+                Please complete the verification below to continue to the requested page.
             </p>
 
+
+            {{-- CAPTCHA ERROR --}}
             @error('captcha')
-                <div class="error">
-                    {{ $message }}
-                </div>
+            <div class="error">
+                {{ $message }}
+            </div>
             @enderror
 
+
             <form method="POST" action="{{ route('traffic-sentinel.captcha.verify') }}">
+
                 @csrf
 
-                <input type="hidden" name="redirect_to" value="{{ $redirectTo }}">
+                <input
+                        type="hidden"
+                        name="redirect_to"
+                        value="{{ $redirectTo ?? session('traffic_sentinel_intended_url') ?? url('/') }}"
+                >
 
-                <div class="cf-turnstile"
-                     data-sitekey="{{ $turnstileSiteKey }}">
+
+                <div
+                        class="cf-turnstile"
+                        data-sitekey="{{ $turnstileSiteKey ?? config('traffic-sentinel.captcha.turnstile.site_key') }}"
+                >
                 </div>
 
+
                 <div class="actions">
+
                     <button type="submit" class="btn">
                         Continue
                     </button>
+
                 </div>
 
             </form>
 
+
             <div class="muted">
                 Traffic Sentinel protection is active on this site.
             </div>
+
         </div>
+
     </div>
+
 </div>
+
 </body>
 </html>
