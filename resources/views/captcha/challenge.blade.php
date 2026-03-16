@@ -92,11 +92,11 @@
                 We detected unusual activity from your network. Please complete the verification below to continue to the requested page.
             </p>
 
-            @if($errors->has('captcha'))
+            @error('captcha')
                 <div class="error">
-                    {{ $errors->first('captcha') }}
+                    {{ $message }}
                 </div>
-            @endif
+            @enderror
 
             <form method="POST" action="{{ route('traffic-sentinel.captcha.verify') }}">
                 @csrf
