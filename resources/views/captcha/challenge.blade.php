@@ -109,22 +109,28 @@
                 </div>
 
                 <div class="actions">
-                    <button type="submit" class="btn" disabled>
+                    <button id="verify-btn" type="submit" class="btn" disabled>
                         Verifying...
                     </button>
                 </div>
+
             </form>
 
+            <script>
+                function turnstileSuccess(token) {
+
+                    const btn = document.getElementById('verify-btn');
+
+                    btn.disabled = false;
+                    btn.innerText = "Continue";
+
+                }
+            </script>
             <div class="muted">
                 Traffic Sentinel protection is active on this site.
             </div>
         </div>
     </div>
 </div>
-<script>
-    function turnstileSuccess(token) {
-        document.querySelector('form').submit();
-    }
-</script>
 </body>
 </html>

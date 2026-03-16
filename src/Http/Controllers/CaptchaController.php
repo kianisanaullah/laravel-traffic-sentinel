@@ -34,22 +34,20 @@ class CaptchaController extends Controller
             ]);
         }
 
-        $response = Http::asForm()->post('https://challenges.cloudflare.com/turnstile/v0/siteverify', [
-            'secret' => $secretKey,
-            'response' => $request->input('cf-turnstile-response'),
-            'remoteip' => $request->ip(),
-        ]);
+        $response = Http::asForm()->post(
+            'https://challenges.cloudflare.com/turnstile/v0/siteverify',
+            [
+                'secret' => $secretKey,
+                'response' => $request->input('cf-turnstile-response'),
+                'remoteip' => $request->ip(),
+            ]
+        );
 
         $result = $response->json();
 
-        if (!($result['success'] ?? false)) {
-            return back()->withErrors([
-                'captcha' => 'CAPTCHA verification failed. Please try again.',
-            ]);
-        }
-
         $ipStored = $tracker->ipForStorage($request->ip());
 
+        // CAPTCHA FAILED
         if (!($result['success'] ?? false)) {
 
             if ($ipStored) {
@@ -71,7 +69,9 @@ class CaptchaController extends Controller
                     Cache::put(
                         $blockKey,
                         true,
-                        now()->addHours((int) config('traffic-sentinel.captcha.block_hours', 24))
+                        now()->addHours(
+                            (int) config('traffic-sentinel.captcha.block_hours', 24)
+                        )
                     );
 
                     Cache::forget($failKey);
@@ -86,6 +86,22 @@ class CaptchaController extends Controller
                 'captcha' => 'CAPTCHA verification failed. Please try again.',
             ]);
         }
+
+        // CAPTCHA SUCCESS
+        if ($ipStored) {
+
+            Cache::put(
+                'ts_captcha_passed:' . $ipStored,
+                true,
+                now()->addMinutes(
+                    (int) config('traffic-sentinel.captcha.pass_minutes', 30)
+                )
+            );
+
+            Cache::forget('ts_captcha_required:' . $ipStored);
+            Cache::forget('ts_captcha_fail:' . $ipStored);
+        }
+
         $redirectTo = $request->input('redirect_to')
             ?: session('traffic_sentinel_intended_url', url('/'));
 
@@ -93,6 +109,7 @@ class CaptchaController extends Controller
 
         return redirect($redirectTo);
     }
+
     private function sendCaptchaBlockAlert(string $ip)
     {
         $emails = collect(explode(',', (string)config('traffic-sentinel.alerts.email')))
