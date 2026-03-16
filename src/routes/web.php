@@ -182,13 +182,15 @@ Route::group([
 
 
 
-    Route::get('/captcha', [CaptchaController::class, 'show'])
-        ->name('traffic-sentinel.captcha');
 
-    Route::post('/captcha/verify', [CaptchaController::class, 'verify'])
-        ->name('traffic-sentinel.captcha.verify');
 
 });
+
+Route::get('/captcha', [CaptchaController::class, 'show'])
+    ->name('traffic-sentinel.captcha');
+
+Route::post('/captcha/verify', [CaptchaController::class, 'verify'])
+    ->name('traffic-sentinel.captcha.verify');
 
 
 /*
