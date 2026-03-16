@@ -268,5 +268,16 @@ return [
         'email' => env('TRAFFIC_SENTINEL_ALERT_EMAIL'),
 
     ],
+    'captcha' => [
+        'enabled' => env('TRAFFIC_SENTINEL_CAPTCHA_ENABLED', true),
+        'challenge_minutes' => env('TRAFFIC_SENTINEL_CAPTCHA_CHALLENGE_MINUTES', 10),
+        'pass_minutes' => env('TRAFFIC_SENTINEL_CAPTCHA_PASS_MINUTES', 30),
+        'fail_limit' => 3,
+        'block_hours' => 24,
+        'turnstile' => [
+            'site_key' => env('TRAFFIC_SENTINEL_TURNSTILE_SITE_KEY'),
+            'secret_key' => env('TRAFFIC_SENTINEL_TURNSTILE_SECRET_KEY'),
+        ],
+    ],
 
 ];

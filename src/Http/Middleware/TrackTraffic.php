@@ -40,12 +40,20 @@ class TrackTraffic
         $tracker = app(TrafficTracker::class);
 
         $ipStored = $tracker->ipForStorage($request->ip());
-        $host = strtolower((string) $request->getHost());
+        $blockedKey = $this->blockedIpKey($ipStored);
+
+        if (Cache::has($blockedKey)) {
+            abort(403, 'Your IP has been blocked by Traffic Sentinel.');
+        }
+        $host = strtolower((string)$request->getHost());
         $app = config('traffic-sentinel.tracking.app_key');
 
         [$isBot, $botName] = $tracker->detectBotFromRequest($request);
+        $captchaRedirect = $this->handleCaptchaChallenge($request, $ipStored);
+        if ($captchaRedirect) {
+            return $captchaRedirect;
+        }
 
-        // Very cheap: cache-only global monitoring
         $this->monitorEveryIp($ipStored, $botName, $host);
 
         // Cached rule lookup to reduce DB pressure
@@ -65,7 +73,7 @@ class TrackTraffic
 
         $response = $next($request);
 
-        $durationMs = (int) round((microtime(true) - $start) * 1000);
+        $durationMs = (int)round((microtime(true) - $start) * 1000);
 
         if ($isNewVisitorId) {
             $this->attachVisitorCookie($request, $response, $visitorId);
@@ -73,7 +81,7 @@ class TrackTraffic
 
         try {
             $status = method_exists($response, 'getStatusCode')
-                ? (int) $response->getStatusCode()
+                ? (int)$response->getStatusCode()
                 : null;
 
             if ($status !== null) {
@@ -122,8 +130,8 @@ class TrackTraffic
             return;
         }
 
-        $threshold = (int) config('traffic-sentinel.alerts.threshold', 0);
-        $window = (int) config('traffic-sentinel.alerts.window_seconds', 60);
+        $threshold = (int)config('traffic-sentinel.alerts.threshold', 0);
+        $window = (int)config('traffic-sentinel.alerts.window_seconds', 60);
 
         if ($threshold <= 0 || $window <= 0) {
             return;
@@ -141,6 +149,7 @@ class TrackTraffic
         if ($hits < $threshold) {
             return;
         }
+        $this->markCaptchaRequired($ipStored);
 
         $cooldownKey = 'ts_alert_sent:' . $monitorKey;
 
@@ -162,8 +171,8 @@ class TrackTraffic
 
     private function sendAlertSafely(array $data): void
     {
-        $emails = collect(explode(',', (string) config('traffic-sentinel.alerts.email', '')))
-            ->map(fn ($e) => trim($e))
+        $emails = collect(explode(',', (string)config('traffic-sentinel.alerts.email', '')))
+            ->map(fn($e) => trim($e))
             ->filter()
             ->values()
             ->all();
@@ -206,15 +215,15 @@ class TrackTraffic
         }
 
         if (!empty($rule->limit_per_minute)) {
-            $this->checkThrottleWindow($baseKey . ':min', (int) $rule->limit_per_minute, 60, 'Too many requests per minute');
+            $this->checkThrottleWindow($baseKey . ':min', (int)$rule->limit_per_minute, 60, 'Too many requests per minute');
         }
 
         if (!empty($rule->limit_per_hour)) {
-            $this->checkThrottleWindow($baseKey . ':hour', (int) $rule->limit_per_hour, 3600, 'Too many requests per hour');
+            $this->checkThrottleWindow($baseKey . ':hour', (int)$rule->limit_per_hour, 3600, 'Too many requests per hour');
         }
 
         if (!empty($rule->limit_per_day)) {
-            $this->checkThrottleWindow($baseKey . ':day', (int) $rule->limit_per_day, 86400, 'Too many requests per day');
+            $this->checkThrottleWindow($baseKey . ':day', (int)$rule->limit_per_day, 86400, 'Too many requests per day');
         }
     }
 
@@ -254,11 +263,11 @@ class TrackTraffic
 
     protected function getOrCreateVisitorId(Request $request): array
     {
-        $cookieName = (string) config('traffic-sentinel.cookie.name', 'ts_vid');
-        $visitorId = (string) $request->cookie($cookieName);
+        $cookieName = (string)config('traffic-sentinel.cookie.name', 'ts_vid');
+        $visitorId = (string)$request->cookie($cookieName);
 
         if ($visitorId === '' || strlen($visitorId) > 80) {
-            $visitorId = (string) Str::uuid();
+            $visitorId = (string)Str::uuid();
             return [$visitorId, true];
         }
 
@@ -267,15 +276,15 @@ class TrackTraffic
 
     protected function attachVisitorCookie(Request $request, $response, string $visitorId): void
     {
-        $cookieName = (string) config('traffic-sentinel.cookie.name', 'ts_vid');
-        $minutes = (int) config('traffic-sentinel.cookie.minutes', 60 * 24 * 365 * 2);
-        $path = (string) config('traffic-sentinel.cookie.path', '/');
+        $cookieName = (string)config('traffic-sentinel.cookie.name', 'ts_vid');
+        $minutes = (int)config('traffic-sentinel.cookie.minutes', 60 * 24 * 365 * 2);
+        $path = (string)config('traffic-sentinel.cookie.path', '/');
         $domain = config('traffic-sentinel.cookie.domain', null);
-        $httpOnly = (bool) config('traffic-sentinel.cookie.http_only', true);
-        $sameSite = (string) config('traffic-sentinel.cookie.same_site', 'Lax');
+        $httpOnly = (bool)config('traffic-sentinel.cookie.http_only', true);
+        $sameSite = (string)config('traffic-sentinel.cookie.same_site', 'Lax');
 
         $secure = config('traffic-sentinel.cookie.secure', null);
-        $secure = $secure === null ? $request->isSecure() : (bool) $secure;
+        $secure = $secure === null ? $request->isSecure() : (bool)$secure;
 
         $cookie = cookie(
             $cookieName,
@@ -298,7 +307,7 @@ class TrackTraffic
     {
         $cfg = config('traffic-sentinel.exclude', []);
 
-        $host = strtolower((string) $request->getHost());
+        $host = strtolower((string)$request->getHost());
         foreach (($cfg['hosts'] ?? []) as $h) {
             $h = strtolower(trim($h));
             if ($h !== '' && $host === $h) return true;
@@ -310,12 +319,12 @@ class TrackTraffic
             if ($p !== '' && str_starts_with($path, $p)) return true;
         }
 
-        $ip = (string) $request->ip();
+        $ip = (string)$request->ip();
         foreach (($cfg['ips'] ?? []) as $blocked) {
             if ($blocked === $ip) return true;
         }
 
-        $ua = (string) $request->userAgent();
+        $ua = (string)$request->userAgent();
         foreach (($cfg['user_agents'] ?? []) as $needle) {
             if ($needle && stripos($ua, $needle) !== false) return true;
         }
@@ -327,10 +336,10 @@ class TrackTraffic
     {
         if ($request->ajax()) return true;
 
-        $xrw = strtolower((string) $request->header('x-requested-with'));
+        $xrw = strtolower((string)$request->header('x-requested-with'));
         if ($xrw === 'xmlhttprequest') return true;
 
-        $accept = strtolower((string) $request->header('accept'));
+        $accept = strtolower((string)$request->header('accept'));
         if (str_contains($accept, 'application/json')) return true;
 
         return $request->wantsJson();
@@ -340,7 +349,76 @@ class TrackTraffic
     {
         if ($request->hasHeader('x-livewire')) return true;
 
-        $path = ltrim((string) $request->path(), '/');
+        $path = ltrim((string)$request->path(), '/');
         return str_starts_with($path, 'livewire/');
+    }
+
+    private function handleCaptchaChallenge(Request $request, ?string $ipStored)
+    {
+        if (!config('traffic-sentinel.captcha.enabled', true)) {
+            return null;
+        }
+
+        if (!$ipStored) {
+            return null;
+        }
+
+        $requiredKey = $this->captchaRequiredKey($ipStored);
+        $passedKey = $this->captchaPassedKey($ipStored);
+
+        if (!Cache::has($requiredKey)) {
+            return null;
+        }
+
+        if (Cache::has($passedKey)) {
+            return null;
+        }
+
+        if ($request->routeIs('traffic-sentinel.captcha') || $request->routeIs('traffic-sentinel.captcha.verify')) {
+            return null;
+        }
+
+        session(['traffic_sentinel_intended_url' => $request->fullUrl()]);
+
+        return redirect()->route('traffic-sentinel.captcha');
+    }
+
+    private function markCaptchaRequired(?string $ipStored): void
+    {
+        if (!config('traffic-sentinel.captcha.enabled', true)) {
+            return;
+        }
+
+        if (!$ipStored) {
+            return;
+        }
+
+        Cache::put(
+            $this->captchaRequiredKey($ipStored),
+            true,
+            now()->addMinutes((int)config('traffic-sentinel.captcha.challenge_minutes', 10))
+        );
+    }
+
+    private function captchaRequiredKey(string $ipStored): string
+    {
+        return 'ts_captcha_required:' . $ipStored;
+    }
+
+    private function captchaPassedKey(string $ipStored): string
+    {
+        return 'ts_captcha_passed:' . $ipStored;
+    }
+    private function blockedIpKey(string $ipStored): string
+    {
+        return 'ts_ip_blocked:' . $ipStored;
+    }
+    private function blockIp(string $ipStored): void
+    {
+        Cache::put(
+            $this->blockedIpKey($ipStored),
+            true,
+            now()->addHours((int)config('traffic-sentinel.block.hours', 24))
+        );
     }
 }

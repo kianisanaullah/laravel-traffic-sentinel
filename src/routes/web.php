@@ -7,6 +7,8 @@ use Kianisanaullah\TrafficSentinel\Http\Controllers\DashboardController;
 use Kianisanaullah\TrafficSentinel\Http\Controllers\ExploreController;
 use Kianisanaullah\TrafficSentinel\Http\Controllers\IpLogsController;
 use Kianisanaullah\TrafficSentinel\Http\Controllers\IpRuleController;
+use Kianisanaullah\TrafficSentinel\Http\Controllers\CaptchaController;
+
 
 Route::group([
     'prefix' => config('traffic-sentinel.dashboard.prefix', 'admin/traffic-sentinel'),
@@ -172,6 +174,17 @@ Route::group([
         Route::post('/throttle', [IpRuleController::class, 'throttle'])
             ->name('traffic-sentinel.ips.throttle');
     });
+
+
+
+
+
+    Route::get('/captcha', [CaptchaController::class, 'show'])
+        ->name('traffic-sentinel.captcha');
+
+    Route::post('/captcha/verify', [CaptchaController::class, 'verify'])
+        ->name('traffic-sentinel.captcha.verify');
+
 });
 
 
