@@ -18,36 +18,41 @@ class IpRuleController extends Controller
         $typeFilter = trim((string) $request->get('type', ''));
         $statusFilter = trim((string) $request->get('status', ''));
 
+        // Humans
         $humanIps = DB::table('traffic_sessions_humans')
-            ->selectRaw("
-            ip,
-            'human' as traffic_type,
-            COUNT(*) as sessions,
-            MAX(last_seen_at) as last_seen
-        ")
             ->whereNotNull('ip')
             ->where('ip', '!=', '')
             ->where('last_seen_at', '>=', $limitDate)
             ->when($ipFilter !== '', function ($q) use ($ipFilter) {
-                $q->where('ip', 'like', '%' . $ipFilter . '%');
+                $q->where('ip', 'like', "%{$ipFilter}%");
             })
+            ->selectRaw("
+            ip,
+            COUNT(*) as sessions,
+            MAX(last_seen_at) as last_seen,
+            1 as human_count,
+            0 as bot_count
+        ")
             ->groupBy('ip');
 
+        // Bots
         $botIps = DB::table('traffic_sessions_bots')
-            ->selectRaw("
-            ip,
-            'bot' as traffic_type,
-            COUNT(*) as sessions,
-            MAX(last_seen_at) as last_seen
-        ")
             ->whereNotNull('ip')
             ->where('ip', '!=', '')
             ->where('last_seen_at', '>=', $limitDate)
             ->when($ipFilter !== '', function ($q) use ($ipFilter) {
-                $q->where('ip', 'like', '%' . $ipFilter . '%');
+                $q->where('ip', 'like', "%{$ipFilter}%");
             })
+            ->selectRaw("
+            ip,
+            COUNT(*) as sessions,
+            MAX(last_seen_at) as last_seen,
+            0 as human_count,
+            1 as bot_count
+        ")
             ->groupBy('ip');
 
+        // Merge and aggregate
         $ips = DB::query()
             ->fromSub($humanIps->unionAll($botIps), 'x')
             ->selectRaw("
@@ -55,11 +60,8 @@ class IpRuleController extends Controller
             SUM(sessions) as sessions,
             MAX(last_seen) as last_seen,
             CASE
-                WHEN SUM(CASE WHEN traffic_type='human' THEN 1 ELSE 0 END) > 0
-                 AND SUM(CASE WHEN traffic_type='bot' THEN 1 ELSE 0 END) > 0
-                    THEN 'mixed'
-                WHEN SUM(CASE WHEN traffic_type='bot' THEN 1 ELSE 0 END) > 0
-                    THEN 'bot'
+                WHEN SUM(human_count) > 0 AND SUM(bot_count) > 0 THEN 'mixed'
+                WHEN SUM(bot_count) > 0 THEN 'bot'
                 ELSE 'human'
             END as traffic_type
         ")
@@ -71,19 +73,21 @@ class IpRuleController extends Controller
             ->paginate(50)
             ->withQueryString();
 
-        $pageIps = collect($ips->items())->pluck('ip')->filter()->values();
+        // Get IPs from current page
+        $pageIps = $ips->pluck('ip');
 
+        // Fetch rules for these IPs only
         $rules = DB::table('traffic_bot_rules')
-            ->whereNotNull('ip')
-            ->where('ip', '!=', '')
             ->whereIn('ip', $pageIps)
             ->select('ip', 'action', 'limit_per_minute', 'limit_per_hour', 'limit_per_day')
             ->get()
             ->keyBy('ip');
 
+        // Status filter (after rules loaded)
         if ($statusFilter !== '') {
             $ips->setCollection(
                 $ips->getCollection()->filter(function ($row) use ($rules, $statusFilter) {
+
                     $rule = $rules[$row->ip] ?? null;
 
                     $status = !$rule
@@ -93,6 +97,7 @@ class IpRuleController extends Controller
                             : ($rule->action === 'throttle' ? 'throttle' : 'monitor'));
 
                     return $status === $statusFilter;
+
                 })->values()
             );
         }
