@@ -165,6 +165,9 @@ Route::group([
         Route::get('/', [IpRuleController::class, 'index'])
             ->name('traffic-sentinel.ips.index');
 
+        Route::get('/focus/{ip}', [IpRuleController::class, 'show'])
+            ->name('traffic-sentinel.ips.show');
+
         Route::post('/monitor', [IpRuleController::class, 'monitor'])
             ->name('traffic-sentinel.ips.monitor');
 

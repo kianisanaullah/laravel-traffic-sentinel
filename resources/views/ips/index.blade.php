@@ -70,6 +70,7 @@
                     <th style="width:120px">Sessions</th>
                     <th style="width:180px">Last Seen</th>
                     <th style="width:220px">Status</th>
+                    <th style="width:100px">Focus</th>
                     <th style="min-width:360px">Actions</th>
                 </tr>
                 </thead>
@@ -188,6 +189,17 @@
                                 </form>
 
                             </div>
+                        </td>
+                        <td class="text-nowrap">
+
+                            <a href="{{ route('traffic-sentinel.ips.show', $row->ip) }}"
+                               class="btn btn-sm btn-outline-info"
+                               title="Focus on IP">
+
+                                <i class="bi bi-search"></i>
+
+                            </a>
+
                         </td>
                     </tr>
                 @endforeach

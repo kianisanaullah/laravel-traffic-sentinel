@@ -138,4 +138,57 @@ class IpRuleController extends Controller
 
         return back()->with('success', 'IP throttling updated.');
     }
+
+    public function show($ip, RuntimeIpLookupService $lookup)
+    {
+        if (!filter_var($ip, FILTER_VALIDATE_IP)) {
+            abort(404);
+        }
+
+        $limitDate = now()->subDays(15);
+
+        $humanSessions = DB::table('traffic_sessions_humans')
+            ->where('ip', $ip)
+            ->where('last_seen_at', '>=', $limitDate);
+
+        $botSessions = DB::table('traffic_sessions_bots')
+            ->where('ip', $ip)
+            ->where('last_seen_at', '>=', $limitDate);
+
+        $sessions = $humanSessions
+            ->selectRaw("
+            'human' as type,
+            url,
+            method,
+            user_agent,
+            last_seen_at
+        ")
+            ->unionAll(
+                $botSessions->selectRaw("
+                'bot' as type,
+                url,
+                method,
+                user_agent,
+                last_seen_at
+            ")
+            );
+
+        $visits = DB::query()
+            ->fromSub($sessions, 's')
+            ->orderByDesc('last_seen_at')
+            ->paginate(50);
+
+        $rule = DB::table('traffic_bot_rules')
+            ->where('ip', $ip)
+            ->first();
+
+        $geo = $lookup->lookup($ip);
+
+        return view('traffic-sentinel::ips.focus', compact(
+            'ip',
+            'visits',
+            'rule',
+            'geo'
+        ));
+    }
 }

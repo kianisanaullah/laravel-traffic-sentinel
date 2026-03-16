@@ -154,7 +154,7 @@
             <div class="actions">
 
                 @php
-                    $ipUrl = url('/admin/traffic-sentinel/ips?ip=' . $ip);
+                    $ipUrl = route('traffic-sentinel.ips.show', $ip);
                 @endphp
 
                 <a href="{{ $ipUrl }}"
