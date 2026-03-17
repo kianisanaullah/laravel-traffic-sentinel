@@ -110,11 +110,11 @@
 
 
             {{-- CAPTCHA ERROR --}}
-            @error('captcha')
-            <div class="error">
-                {{ $message }}
-            </div>
-            @enderror
+            @if(isset($errors) && $errors->has('captcha'))
+                <div class="error">
+                    {{ $errors->first('captcha') }}
+                </div>
+            @endif
 
 
             <form method="POST" action="{{ route('traffic-sentinel.captcha.verify') }}">
