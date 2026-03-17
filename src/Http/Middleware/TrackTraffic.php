@@ -15,6 +15,12 @@ class TrackTraffic
 {
     public function handle(Request $request, Closure $next)
     {
+        $ip = $request->ip();
+
+        if (app(WhitelistIPService::class)->isWhitelisted($ip)) {
+            return $next($request);
+        }
+
         if (!config('traffic-sentinel.enabled')) {
             return $next($request);
         }
@@ -365,8 +371,15 @@ class TrackTraffic
         }
 
         $requiredKey = $this->captchaRequiredKey($ipStored);
-        $passedKey   = $this->captchaPassedKey($ipStored);
+        $passedKey = $this->captchaPassedKey($ipStored);
 
+        if (!Cache::has($requiredKey)) {
+            return null;
+        }
+
+        if (Cache::has($passedKey)) {
+            return null;
+        }
 
         if (
             $request->is('captcha') ||
@@ -376,30 +389,11 @@ class TrackTraffic
             return null;
         }
 
-
-        if (!Cache::has($requiredKey)) {
-            return null;
-        }
-
-
-        if (Cache::has($passedKey)) {
-            return null;
-        }
-
-       $count = $request->session()->get('ts_captcha_redirect_count', 0);
-
-        if ($count > 3) {
-            return response('Too many redirects prevented', 429);
-        }
-
-        $request->session()->put('ts_captcha_redirect_count', $count + 1);
-
-        session([
-            'traffic_sentinel_intended_url' => $request->fullUrl()
-        ]);
+        session(['traffic_sentinel_intended_url' => $request->fullUrl()]);
 
         return redirect()->route('traffic-sentinel.captcha');
     }
+
     private function markCaptchaRequired(?string $ipStored): void
     {
         if (!config('traffic-sentinel.captcha.enabled', true)) {
