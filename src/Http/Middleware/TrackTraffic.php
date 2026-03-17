@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Kianisanaullah\TrafficSentinel\Services\TrafficTracker;
 use Kianisanaullah\TrafficSentinel\Services\Bots\BotProtectionService;
+use Kianisanaullah\TrafficSentinel\Services\WhitelistIPService;
 
 class TrackTraffic
 {
@@ -364,25 +365,41 @@ class TrackTraffic
         }
 
         $requiredKey = $this->captchaRequiredKey($ipStored);
-        $passedKey = $this->captchaPassedKey($ipStored);
+        $passedKey   = $this->captchaPassedKey($ipStored);
+
+
+        if (
+            $request->is('captcha') ||
+            $request->is('captcha/*') ||
+            $request->routeIs('traffic-sentinel.captcha.*')
+        ) {
+            return null;
+        }
+
 
         if (!Cache::has($requiredKey)) {
             return null;
         }
 
+
         if (Cache::has($passedKey)) {
             return null;
         }
 
-        if ($request->routeIs('traffic-sentinel.captcha') || $request->routeIs('traffic-sentinel.captcha.verify')) {
-            return null;
+       $count = $request->session()->get('ts_captcha_redirect_count', 0);
+
+        if ($count > 3) {
+            return response('Too many redirects prevented', 429);
         }
 
-        session(['traffic_sentinel_intended_url' => $request->fullUrl()]);
+        $request->session()->put('ts_captcha_redirect_count', $count + 1);
+
+        session([
+            'traffic_sentinel_intended_url' => $request->fullUrl()
+        ]);
 
         return redirect()->route('traffic-sentinel.captcha');
     }
-
     private function markCaptchaRequired(?string $ipStored): void
     {
         if (!config('traffic-sentinel.captcha.enabled', true)) {
