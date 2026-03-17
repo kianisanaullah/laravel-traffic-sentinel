@@ -179,18 +179,15 @@ Route::group([
     });
 
 
-
-
-
-
-
 });
 
 Route::get('/captcha', [CaptchaController::class, 'show'])
-    ->name('traffic-sentinel.captcha');
+    ->name('traffic-sentinel.captcha')
+    ->withoutMiddleware(\Kianisanaullah\TrafficSentinel\Http\Middleware\TrackTraffic::class);
 
 Route::post('/captcha/verify', [CaptchaController::class, 'verify'])
-    ->name('traffic-sentinel.captcha.verify');
+    ->name('traffic-sentinel.captcha.verify')
+    ->withoutMiddleware(\Kianisanaullah\TrafficSentinel\Http\Middleware\TrackTraffic::class);
 
 
 /*
