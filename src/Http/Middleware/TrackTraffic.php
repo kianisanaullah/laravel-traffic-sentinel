@@ -14,11 +14,7 @@ class TrackTraffic
 {
     public function handle(Request $request, Closure $next)
     {
-        $ip = $request->ip();
-
-        if (app(WhitelistIPService::class)->isWhitelisted($ip)) {
-            return $next($request);
-        }
+        
 
         if (!config('traffic-sentinel.enabled')) {
             return $next($request);
