@@ -13,9 +13,9 @@ class CaptchaController extends Controller
 {
     public function show(Request $request)
     {
-        if (!session()->has('traffic_sentinel_intended_url')) {
-            return redirect('/');
-        }
+//        if (!session()->has('traffic_sentinel_intended_url')) {
+//            return redirect('/');
+//        }
 
         return view('traffic-sentinel::captcha.challenge', [
             'turnstileSiteKey' => config('traffic-sentinel.captcha.turnstile.site_key'),
