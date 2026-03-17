@@ -14,13 +14,17 @@ class TrackTraffic
 {
     public function handle(Request $request, Closure $next)
     {
-        
+
 
         if (!config('traffic-sentinel.enabled')) {
             return $next($request);
         }
 
         if (app()->runningInConsole()) {
+            return $next($request);
+        }
+
+        if (str_contains($request->path(), 'captcha')) {
             return $next($request);
         }
 
