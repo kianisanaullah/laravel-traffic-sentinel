@@ -180,6 +180,12 @@
                     <i class="bi bi-geo-alt me-1"></i>IPs
                 </a>
             </li>
+            <li class="nav-item">
+                <a class="nav-link @if(request()->routeIs('traffic-sentinel.whitelist.*')) active @endif"
+                   href="{{ route('traffic-sentinel.whitelist.index')}}">
+                    <i class="bi bi-shield-check me-1"></i>Whitelist
+                </a>
+            </li>
         </ul>
     </div>
 </div>

@@ -209,4 +209,47 @@ class IpRuleController extends Controller
             'geo'
         ));
     }
+    public function whitelist_index()
+    {
+        $ips = DB::table('traffic_whitelist_ips')
+            ->orderByDesc('created_at')
+            ->paginate(25);
+
+        return view('traffic-sentinel::ips.whitelist', compact('ips'));
+    }
+    public function whitelist_store(Request $request)
+    {
+        $request->validate([
+            'ip' => 'required|ip',
+            'name' => 'nullable|string|max:255',
+            'description' => 'nullable|string',
+            'expires_at' => 'nullable|date'
+        ]);
+
+        DB::table('traffic_whitelist_ips')->insert([
+            'ip' => $request->ip,
+            'name' => $request->name,
+            'description' => $request->description,
+            'expires_at' => $request->expires_at,
+            'active' => true,
+            'created_at' => now(),
+            'updated_at' => now()
+        ]);
+
+        Cache::forget('ts_whitelist_'.$request->ip);
+
+        return back()->with('success','IP added to whitelist');
+    }
+    public function whitelist_destroy($id)
+    {
+        $row = DB::table('traffic_whitelist_ips')->where('id',$id)->first();
+
+        if($row){
+            Cache::forget('ts_whitelist_'.$row->ip);
+        }
+
+        DB::table('traffic_whitelist_ips')->where('id',$id)->delete();
+
+        return back()->with('success','Whitelist entry removed');
+    }
 }

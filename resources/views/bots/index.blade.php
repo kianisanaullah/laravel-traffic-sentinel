@@ -71,7 +71,7 @@
                     <th style="width:180px">Last Seen</th>
                     <th style="width:180px">Status</th>
                     <th style="width:260px">Actions</th>
-                    <th style="width:50px">Details</th>
+                    <th style="width:40px">Details</th>
                 </tr>
                 </thead>
 
@@ -178,7 +178,7 @@
                         <td>
                             <a href="{{ route('traffic-sentinel.bots.show', $bot->bot_name)}}"
                                class="btn btn-sm btn-outline-info">
-                                <i class="bi bi-eye me-1"></i> View
+                                <i class="bi bi-eye me-1"></i>
                             </a>
                         </td>
                     </tr>
