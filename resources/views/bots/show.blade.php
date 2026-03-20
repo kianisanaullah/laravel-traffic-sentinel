@@ -14,8 +14,7 @@
 
                 <div class="d-flex gap-2 align-items-center flex-wrap">
 
-                    {{-- FILTER BADGES --}}
-                    <span class="ts-badge">
+                <span class="ts-badge">
                     <i class="bi bi-calendar me-1"></i>
                     Last {{ $days ?? 15 }} Days
                 </span>
@@ -70,6 +69,32 @@
             </div>
         </div>
 
+        {{-- HELPERS --}}
+        @php
+            function subnet($ip) {
+                if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+                    $parts = explode('.', $ip);
+                    return "{$parts[0]}.{$parts[1]}.{$parts[2]}.0/24";
+                }
+                return 'IPv6';
+            }
+
+            function subnetColor($subnet) {
+                $hash = md5($subnet);
+
+                $r = hexdec(substr($hash, 0, 2));
+                $g = hexdec(substr($hash, 2, 2));
+                $b = hexdec(substr($hash, 4, 2));
+
+                // keep colors darker for readability
+                $r = $r % 200;
+                $g = $g % 200;
+                $b = $b % 200;
+
+                return "rgb($r,$g,$b)";
+            }
+        @endphp
+
         {{-- IP TABLE --}}
         <div class="table-responsive">
             <table class="table ts-table table-hover mb-0 align-middle">
@@ -84,13 +109,28 @@
 
                 <tbody>
                 @foreach($ips as $ip)
-                    @php $collapseId = 'ip-' . md5($ip->ip); @endphp
+                    @php
+                        $collapseId = 'ip-' . md5($ip->ip);
+                        $subnet = subnet($ip->ip);
+                        $color = subnetColor($subnet);
+                    @endphp
 
                     {{-- MAIN ROW --}}
                     <tr>
 
                         <td>
-                            <span class="ts-badge">{{ $ip->ip }}</span>
+                            <div class="d-flex flex-column">
+
+                            <span class="ts-badge"
+                                  style="background: {{ $color }}; color:#fff;">
+                                {{ $ip->ip }}
+                            </span>
+
+                                <small style="opacity:.6; font-size:10px">
+                                    {{ $subnet }}
+                                </small>
+
+                            </div>
                         </td>
 
                         <td>
@@ -115,7 +155,7 @@
 
                     </tr>
 
-                    {{-- EXPANDABLE ROW --}}
+                    {{-- EXPANDABLE --}}
                     <tr class="collapse-row">
                         <td colspan="4" class="p-0 border-0">
 
@@ -131,7 +171,6 @@
                                         $ipPages = $pages[$ip->ip] ?? collect();
                                     @endphp
 
-                                    {{-- TOP 10 --}}
                                     <div class="d-flex flex-wrap gap-2">
                                         @foreach($ipPages->take(10) as $page)
                                             <span class="ts-pill small">
@@ -141,10 +180,8 @@
                                         @endforeach
                                     </div>
 
-                                    {{-- SHOW MORE --}}
                                     @if($ipPages->count() > 10)
                                         <div class="mt-2">
-
                                             <button
                                                     class="btn btn-sm btn-link text-info p-0"
                                                     onclick="this.nextElementSibling.classList.toggle('d-none')">
@@ -159,7 +196,6 @@
                                                 </span>
                                                 @endforeach
                                             </div>
-
                                         </div>
                                     @endif
 

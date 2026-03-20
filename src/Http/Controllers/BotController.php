@@ -144,14 +144,27 @@ class BotController extends Controller
         // 🔹 IPs
         $ips = (clone $base)
             ->selectRaw("
-            ip,
-            COUNT(*) as sessions,
-            MAX(last_seen_at) as last_seen
-        ")
+        ip,
+        COUNT(*) as sessions,
+        MAX(last_seen_at) as last_seen
+    ")
             ->groupBy('ip')
             ->orderByDesc('sessions')
             ->paginate(20)
             ->withQueryString();
+
+        $ips->getCollection()->transform(function ($item) {
+
+            if (filter_var($item->ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+                // /24 subnet
+                $parts = explode('.', $item->ip);
+                $item->subnet = $parts[0].'.'.$parts[1].'.'.$parts[2].'.0/24';
+            } else {
+                $item->subnet = 'IPv6';
+            }
+
+            return $item;
+        });
 
         $ipList = $ips->pluck('ip');
 
