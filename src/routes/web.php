@@ -153,6 +153,8 @@ Route::group([
 
         Route::post('/monitor', [BotController::class, 'monitor'])
             ->name('traffic-sentinel.bots.monitor');
+        Route::get('/bots/{bot}', [BotController::class, 'show'])
+            ->name('traffic-sentinel.bots.show');
     });
 
 
@@ -176,7 +178,21 @@ Route::group([
 
         Route::post('/throttle', [IpRuleController::class, 'throttle'])
             ->name('traffic-sentinel.ips.throttle');
+//        // 📋 List page
+//        Route::get('/whitelist', [IpRuleController::class, 'whitelist_index'])
+//            ->name('whitelist.index');
+//
+//        // ➕ Add IP
+//        Route::post('/whitelist', [IpRuleController::class, 'whitelist_store'])
+//            ->name('whitelist.store');
+//
+//        // ❌ Delete IP
+//        Route::delete('/whitelist/{id}', [IpRuleController::class, 'whitelist_destroy'])
+//            ->name('whitelist.delete');
+
+
     });
+
 
 
 });

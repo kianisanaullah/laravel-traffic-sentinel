@@ -90,10 +90,10 @@
 
                     <tr>
                         <td>
-                            <span class="ts-badge">
+                            <a href="{{ route('traffic-sentinel.bots.show', $bot->bot_name) }}" class="ts-badge text-decoration-none">
                                 <i class="bi bi-robot me-1"></i>
                                 {{ $bot->bot_name ?: 'Unknown Bot' }}
-                            </span>
+                            </a>
                         </td>
 
                         <td>

@@ -111,4 +111,71 @@ class BotController extends Controller
 
         return back()->with('success','Bot set to monitor');
     }
+    public function show($bot)
+    {
+        $bot = $bot === 'unknown' ? null : $bot;
+
+        // 🔹 Summary
+        $summary = DB::table('traffic_sessions_bots')
+            ->where(function ($q) use ($bot) {
+                if ($bot === null) {
+                    $q->whereNull('bot_name');
+                } else {
+                    $q->where('bot_name', $bot);
+                }
+            })
+            ->selectRaw("
+            COUNT(*) as sessions,
+            COUNT(DISTINCT ip) as ips,
+            MAX(last_seen_at) as last_seen
+        ")
+            ->first();
+
+        // 🔹 Rule
+        $rule = DB::table('traffic_bot_rules')
+            ->where('bot_name', $bot)
+            ->first();
+
+        // 🔹 IP List
+        $ips = DB::table('traffic_sessions_bots')
+            ->where(function ($q) use ($bot) {
+                if ($bot === null) {
+                    $q->whereNull('bot_name');
+                } else {
+                    $q->where('bot_name', $bot);
+                }
+            })
+            ->selectRaw("
+            ip,
+            COUNT(*) as sessions,
+            MAX(last_seen_at) as last_seen
+        ")
+            ->groupBy('ip')
+            ->orderByDesc('sessions')
+            ->paginate(20);
+
+        // 🔹 Pages per IP (important 🔥)
+        $ipList = $ips->pluck('ip');
+
+        $pages = DB::table('traffic_sessions')
+            ->whereIn('ip', $ipList)
+            ->selectRaw("
+            ip,
+            url,
+            COUNT(*) as visits,
+            MAX(created_at) as last_visit
+        ")
+            ->groupBy('ip', 'url')
+            ->orderByDesc('visits')
+            ->get()
+            ->groupBy('ip');
+
+        return view('traffic-sentinel::bots.show', compact(
+            'bot',
+            'summary',
+            'rule',
+            'ips',
+            'pages'
+        ));
+    }
 }
