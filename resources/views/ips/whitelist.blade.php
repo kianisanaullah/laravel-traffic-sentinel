@@ -9,7 +9,7 @@
 
         <div class="p-3">
 
-            <form method="POST" action="{{ route('traffic-sentinel.whitelist.store') }}">
+            <form method="POST" action="{{ route('whitelist.store') }}">
 
                 @csrf
 
@@ -98,7 +98,7 @@
                         <td>
 
                             <form method="POST"
-                                  action="{{ route('traffic-sentinel.whitelist.delete',$ip->id) }}"
+                                  action="{{ route('whitelist.delete',$ip->id) }}"
                                   onsubmit="return confirm('Remove this IP?')">
 
                                 @csrf

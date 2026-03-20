@@ -574,7 +574,7 @@
                 </li>
                 <li class="nav-item">
                     <a class="nav-link @if(request()->routeIs('traffic-sentinel.whitelist.*')) active @endif"
-                       href="{{ route('traffic-sentinel.whitelist.index')}}">
+                       href="{{ route('whitelist.index')}}">
                         <i class="bi bi-shield-check me-1"></i>Whitelist
                     </a>
                 </li>
