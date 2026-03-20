@@ -87,7 +87,7 @@
 
                                 @foreach(($pages[$ip->ip] ?? []) as $page)
                                     <span class="ts-pill" style="font-size:11px">
-                                    {{ Str::limit($page->url, 60) }}
+                                    {{ Str::limit($page->full_url ?? $page->path, 60) }}
                                     ({{ $page->visits }})
                                 </span>
                                 @endforeach

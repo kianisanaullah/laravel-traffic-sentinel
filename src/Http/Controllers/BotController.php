@@ -157,15 +157,21 @@ class BotController extends Controller
         // 🔹 Pages per IP (important 🔥)
         $ipList = $ips->pluck('ip');
 
-        $pages = DB::table('traffic_sessions')
+        $pages = DB::table('traffic_pageviews_bots')
             ->whereIn('ip', $ipList)
+            ->when($bot !== null, function ($q) use ($bot) {
+                $q->where('bot_name', $bot);
+            }, function ($q) {
+                $q->whereNull('bot_name');
+            })
             ->selectRaw("
-            ip,
-            url,
-            COUNT(*) as visits,
-            MAX(created_at) as last_visit
-        ")
-            ->groupBy('ip', 'url')
+        ip,
+        path,
+        full_url,
+        COUNT(*) as visits,
+        MAX(viewed_at) as last_visit
+    ")
+            ->groupBy('ip', 'path', 'full_url')
             ->orderByDesc('visits')
             ->get()
             ->groupBy('ip');
