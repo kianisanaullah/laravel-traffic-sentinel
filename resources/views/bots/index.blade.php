@@ -176,7 +176,7 @@
                             </div>
                         </td>
                         <td>
-                            <a href="{{ route('traffic-sentinel.bots.show'}}"
+                            <a href="{{ route('traffic-sentinel.bots.show')}}"
                                class="btn btn-sm btn-outline-info">
                                 <i class="bi bi-eye me-1"></i> View
                             </a>
