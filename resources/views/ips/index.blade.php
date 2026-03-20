@@ -224,6 +224,94 @@
         </div>
 
     </div>
+    <div class="modal fade" id="whitelistModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <form method="POST" action="{{ route('traffic-sentinel.whitelist.store') }}">
+                @csrf
+
+                <div class="modal-content ts-card">
+
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="bi bi-shield-check me-2"></i>
+                            Add to Whitelist
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+
+                    <div class="modal-body">
+
+                        <div class="row g-3">
+
+                            {{-- IP --}}
+                            <div class="col-md-6">
+                                <label class="form-label">IP / Subnet</label>
+                                <input type="text"
+                                       name="ip"
+                                       id="wl_ip"
+                                       class="form-control"
+                                       required>
+                            </div>
+
+                            {{-- TYPE --}}
+                            <div class="col-md-3">
+                                <label class="form-label">Type</label>
+                                <select name="type" id="wl_type" class="form-select">
+                                    <option value="ip">IP</option>
+                                    <option value="subnet">Subnet</option>
+                                </select>
+                            </div>
+
+                            {{-- QUICK SUBNET --}}
+                            <div class="col-md-3 d-flex align-items-end">
+                                <button type="button"
+                                        class="btn btn-outline-info w-100"
+                                        id="wl_make_subnet">
+                                    Use /16
+                                </button>
+                            </div>
+
+                            {{-- NAME --}}
+                            <div class="col-md-6">
+                                <label class="form-label">Name</label>
+                                <input type="text"
+                                       name="name"
+                                       class="form-control"
+                                       placeholder="Google Bot / Internal">
+                            </div>
+
+                            {{-- EXPIRY --}}
+                            <div class="col-md-6">
+                                <label class="form-label">Expires At</label>
+                                <input type="datetime-local"
+                                       name="expires_at"
+                                       class="form-control">
+                            </div>
+
+                            {{-- DESCRIPTION --}}
+                            <div class="col-12">
+                                <label class="form-label">Description</label>
+                                <textarea name="description"
+                                          class="form-control"
+                                          rows="2"></textarea>
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                    <div class="modal-footer">
+                        <button class="btn btn-success">
+                            <i class="bi bi-check-circle me-1"></i>
+                            Save
+                        </button>
+                    </div>
+
+                </div>
+
+            </form>
+        </div>
+    </div>
 @endsection
 
 @push('scripts')
@@ -237,4 +325,45 @@
             });
         });
     </script>
-@endpush
+
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+
+                const modal = document.getElementById('whitelistModal');
+                const ipInput = document.getElementById('wl_ip');
+                const typeSelect = document.getElementById('wl_type');
+                const subnetBtn = document.getElementById('wl_make_subnet');
+
+                let currentIP = '';
+
+                modal.addEventListener('show.bs.modal', function (event) {
+                    const button = event.relatedTarget;
+                    currentIP = button.getAttribute('data-ip');
+
+                    ipInput.value = currentIP;
+                    typeSelect.value = 'ip';
+                });
+
+                // Auto detect subnet type
+                ipInput.addEventListener('input', function () {
+                    if (this.value.includes('/')) {
+                        typeSelect.value = 'subnet';
+                    } else {
+                        typeSelect.value = 'ip';
+                    }
+                });
+
+                // Convert to /16 subnet
+                subnetBtn.addEventListener('click', function () {
+                    if (!currentIP) return;
+
+                    const parts = currentIP.split('.');
+                    if (parts.length === 4) {
+                        ipInput.value = parts[0] + '.' + parts[1] + '.0.0/16';
+                        typeSelect.value = 'subnet';
+                    }
+                });
+
+            });
+        </script>
+    @endpush
