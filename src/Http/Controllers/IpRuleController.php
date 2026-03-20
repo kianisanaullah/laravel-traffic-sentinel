@@ -220,14 +220,40 @@ class IpRuleController extends Controller
     public function whitelist_store(Request $request)
     {
         $request->validate([
-            'ip' => 'required|ip',
+            'ip' => ['required', 'string', function ($attr, $value, $fail) {
+
+                if (filter_var($value, FILTER_VALIDATE_IP)) {
+                    return;
+                }
+
+                if (preg_match('/^(\d{1,3}\.){3}\d{1,3}\/\d{1,2}$/', $value)) {
+
+                    [$ip, $mask] = explode('/', $value);
+
+                    if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+                        return $fail('Invalid subnet IP');
+                    }
+
+                    if ($mask < 0 || $mask > 32) {
+                        return $fail('Invalid subnet mask');
+                    }
+
+                    return;
+                }
+
+                $fail('Invalid IP or subnet format');
+            }],
+
             'name' => 'nullable|string|max:255',
             'description' => 'nullable|string',
             'expires_at' => 'nullable|date'
         ]);
 
+        $type = str_contains($request->ip, '/') ? 'subnet' : 'ip';
+
         DB::table('traffic_whitelist_ips')->insert([
             'ip' => $request->ip,
+            'type' => $type,
             'name' => $request->name,
             'description' => $request->description,
             'expires_at' => $request->expires_at,
@@ -236,9 +262,11 @@ class IpRuleController extends Controller
             'updated_at' => now()
         ]);
 
-        Cache::forget('ts_whitelist_'.$request->ip);
+        Cache::forget('ts_whitelist_all');
 
-        return back()->with('success','IP added to whitelist');
+        return back()->with('success', $type === 'subnet'
+            ? 'Subnet added to whitelist'
+            : 'IP added to whitelist');
     }
     public function whitelist_destroy($id)
     {

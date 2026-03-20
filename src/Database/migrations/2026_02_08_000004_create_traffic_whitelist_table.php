@@ -14,7 +14,7 @@ return new class extends Migration
 
             $table->string('ip', 191)->index();
 
-            $table->string('name')->nullable();      // Friendly name
+            $table->string('name')->nullable();
             $table->string('description')->nullable();
 
             $table->boolean('active')->default(true);

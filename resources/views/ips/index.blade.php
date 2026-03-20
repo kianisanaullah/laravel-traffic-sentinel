@@ -199,6 +199,16 @@
                                 <i class="bi bi-search"></i>
 
                             </a>
+                            <button
+                                    class="btn btn-sm btn-outline-success"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#whitelistModal"
+                                    data-ip="{{ $row->ip }}"
+                                    title="Whitelist IP">
+
+                                <i class="bi bi-shield-check"></i>
+
+                            </button>
 
                         </td>
                     </tr>
