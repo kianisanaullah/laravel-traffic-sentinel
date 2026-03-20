@@ -71,6 +71,7 @@
                     <th style="width:180px">Last Seen</th>
                     <th style="width:180px">Status</th>
                     <th style="width:260px">Actions</th>
+                    <th style="width:50px">Details</th>
                 </tr>
                 </thead>
 
@@ -173,6 +174,12 @@
                                 </form>
 
                             </div>
+                        </td>
+                        <td>
+                            <a href="{{ route('traffic-sentinel.bots.show'}}"
+                               class="btn btn-sm btn-outline-info">
+                                <i class="bi bi-eye me-1"></i> View
+                            </a>
                         </td>
                     </tr>
 
