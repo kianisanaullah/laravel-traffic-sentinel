@@ -111,19 +111,29 @@ class BotController extends Controller
 
         return back()->with('success','Bot set to monitor');
     }
-    public function show($bot)
+    public function show(Request $request, $bot)
     {
         $bot = $bot === 'unknown' ? null : $bot;
 
-        // 🔹 Summary
-        $summary = DB::table('traffic_sessions_bots')
+        $days = (int) $request->get('days', 15);
+        $host = $request->get('host');
+
+        $limitDate = now()->subDays($days);
+
+        // 🔹 Base filter (REUSABLE)
+        $base = DB::table('traffic_sessions_bots')
+            ->where('last_seen_at', '>=', $limitDate)
+            ->when($host, fn($q) => $q->where('host', $host))
             ->where(function ($q) use ($bot) {
                 if ($bot === null) {
                     $q->whereNull('bot_name');
                 } else {
                     $q->where('bot_name', $bot);
                 }
-            })
+            });
+
+        // 🔹 Summary
+        $summary = (clone $base)
             ->selectRaw("
             COUNT(*) as sessions,
             COUNT(DISTINCT ip) as ips,
@@ -131,13 +141,25 @@ class BotController extends Controller
         ")
             ->first();
 
-        // 🔹 Rule
-        $rule = DB::table('traffic_bot_rules')
-            ->where('bot_name', $bot)
-            ->first();
+        // 🔹 IPs
+        $ips = (clone $base)
+            ->selectRaw("
+            ip,
+            COUNT(*) as sessions,
+            MAX(last_seen_at) as last_seen
+        ")
+            ->groupBy('ip')
+            ->orderByDesc('sessions')
+            ->paginate(20)
+            ->withQueryString();
 
-        // 🔹 IP List
-        $ips = DB::table('traffic_sessions_bots')
+        $ipList = $ips->pluck('ip');
+
+        // 🔹 Pages (IMPORTANT: also filtered)
+        $pages = DB::table('traffic_pageviews_bots')
+            ->whereIn('ip', $ipList)
+            ->where('viewed_at', '>=', $limitDate)
+            ->when($host, fn($q) => $q->where('host', $host))
             ->where(function ($q) use ($bot) {
                 if ($bot === null) {
                     $q->whereNull('bot_name');
@@ -147,41 +169,22 @@ class BotController extends Controller
             })
             ->selectRaw("
             ip,
-            COUNT(*) as sessions,
-            MAX(last_seen_at) as last_seen
+            full_url,
+            COUNT(*) as visits,
+            MAX(viewed_at) as last_visit
         ")
-            ->groupBy('ip')
-            ->orderByDesc('sessions')
-            ->paginate(20);
-
-        // 🔹 Pages per IP (important 🔥)
-        $ipList = $ips->pluck('ip');
-
-        $pages = DB::table('traffic_pageviews_bots')
-            ->whereIn('ip', $ipList)
-            ->when($bot !== null, function ($q) use ($bot) {
-                $q->where('bot_name', $bot);
-            }, function ($q) {
-                $q->whereNull('bot_name');
-            })
-            ->selectRaw("
-        ip,
-        path,
-        full_url,
-        COUNT(*) as visits,
-        MAX(viewed_at) as last_visit
-    ")
-            ->groupBy('ip', 'path', 'full_url')
+            ->groupBy('ip', 'full_url')
             ->orderByDesc('visits')
             ->get()
             ->groupBy('ip');
 
+        // 🔹 Rule
+        $rule = DB::table('traffic_bot_rules')
+            ->where('bot_name', $bot)
+            ->first();
+
         return view('traffic-sentinel::bots.show', compact(
-            'bot',
-            'summary',
-            'rule',
-            'ips',
-            'pages'
+            'bot', 'summary', 'ips', 'pages', 'rule', 'days', 'host'
         ));
     }
 }

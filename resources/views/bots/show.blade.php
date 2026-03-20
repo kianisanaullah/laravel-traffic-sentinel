@@ -12,9 +12,27 @@
                     {{ $bot ?? 'Unknown Bot' }}
                 </div>
 
-                <a href="{{ route('traffic-sentinel.bots.index') }}" class="btn btn-sm btn-outline-secondary">
-                    ← Back
-                </a>
+                <div class="d-flex gap-2 align-items-center flex-wrap">
+
+                    {{-- FILTER BADGES --}}
+                    <span class="ts-badge">
+                    <i class="bi bi-calendar me-1"></i>
+                    Last {{ $days ?? 15 }} Days
+                </span>
+
+                    @if(!empty($host))
+                        <span class="ts-badge">
+                        <i class="bi bi-globe me-1"></i>
+                        {{ $host }}
+                    </span>
+                    @endif
+
+                    <a href="{{ route('traffic-sentinel.bots.index', request()->query()) }}"
+                       class="btn btn-sm btn-outline-secondary">
+                        ← Back
+                    </a>
+
+                </div>
             </div>
         </div>
 
@@ -60,12 +78,15 @@
                     <th>IP</th>
                     <th>Sessions</th>
                     <th>Last Seen</th>
-                    <th>Visited Pages</th>
+                    <th style="width:120px">Details</th>
                 </tr>
                 </thead>
 
                 <tbody>
                 @foreach($ips as $ip)
+                    @php $collapseId = 'ip-' . md5($ip->ip); @endphp
+
+                    {{-- MAIN ROW --}}
                     <tr>
 
                         <td>
@@ -83,19 +104,72 @@
                         </td>
 
                         <td>
-                            <div class="d-flex flex-column gap-1">
-
-                                @foreach(($pages[$ip->ip] ?? []) as $page)
-                                    <span class="ts-pill" style="font-size:11px">
-                                    {{ Str::limit($page->full_url ?? $page->path, 60) }}
-                                    ({{ $page->visits }})
-                                </span>
-                                @endforeach
-
-                            </div>
+                            <button
+                                    class="btn btn-sm btn-outline-light"
+                                    data-bs-toggle="collapse"
+                                    data-bs-target="#{{ $collapseId }}">
+                                <i class="bi bi-chevron-down me-1"></i>
+                                View
+                            </button>
                         </td>
 
                     </tr>
+
+                    {{-- EXPANDABLE ROW --}}
+                    <tr class="collapse-row">
+                        <td colspan="4" class="p-0 border-0">
+
+                            <div class="collapse" id="{{ $collapseId }}">
+
+                                <div class="p-3" style="background: rgba(255,255,255,.02)">
+
+                                    <div class="fw-semibold mb-2">
+                                        <i class="bi bi-globe me-1"></i>Visited Pages
+                                    </div>
+
+                                    @php
+                                        $ipPages = $pages[$ip->ip] ?? collect();
+                                    @endphp
+
+                                    {{-- TOP 10 --}}
+                                    <div class="d-flex flex-wrap gap-2">
+                                        @foreach($ipPages->take(10) as $page)
+                                            <span class="ts-pill small">
+                                            {{ Str::limit($page->full_url ?? $page->path, 60) }}
+                                            ({{ $page->visits }})
+                                        </span>
+                                        @endforeach
+                                    </div>
+
+                                    {{-- SHOW MORE --}}
+                                    @if($ipPages->count() > 10)
+                                        <div class="mt-2">
+
+                                            <button
+                                                    class="btn btn-sm btn-link text-info p-0"
+                                                    onclick="this.nextElementSibling.classList.toggle('d-none')">
+                                                Show More
+                                            </button>
+
+                                            <div class="d-none mt-2 d-flex flex-wrap gap-2">
+                                                @foreach($ipPages->slice(10) as $page)
+                                                    <span class="ts-pill small">
+                                                    {{ Str::limit($page->full_url ?? $page->path, 60) }}
+                                                    ({{ $page->visits }})
+                                                </span>
+                                                @endforeach
+                                            </div>
+
+                                        </div>
+                                    @endif
+
+                                </div>
+
+                            </div>
+
+                        </td>
+                    </tr>
+
                 @endforeach
                 </tbody>
             </table>
@@ -108,3 +182,24 @@
 
     </div>
 @endsection
+
+@push('styles')
+    <style>
+        .ts-pill.small {
+            font-size: 11px;
+            opacity: 0.85;
+        }
+
+        .collapse-row td {
+            border-top: none !important;
+        }
+
+        .table tr:hover {
+            background: rgba(255,255,255,0.03);
+        }
+
+        .btn-outline-light {
+            border-color: rgba(255,255,255,.2);
+        }
+    </style>
+@endpush
