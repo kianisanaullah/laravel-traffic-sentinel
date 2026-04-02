@@ -9,16 +9,20 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Kianisanaullah\TrafficSentinel\Services\TrafficTracker;
 use Kianisanaullah\TrafficSentinel\Services\Bots\BotProtectionService;
+use Kianisanaullah\TrafficSentinel\Services\WhitelistIPService;
 
 class TrackTraffic
 {
     public function handle(Request $request, Closure $next)
     {
-
-
         if (!config('traffic-sentinel.enabled')) {
             return $next($request);
         }
+//        $ip = $request->ip();
+//
+//        if (app(WhitelistIPService::class)->isWhitelisted($ip)) {
+//            return $next($request);
+//        }
 
         if (app()->runningInConsole()) {
             return $next($request);
@@ -31,6 +35,27 @@ class TrackTraffic
         if ($this->shouldExclude($request)) {
             return $next($request);
         }
+        
+        $userAgent = trim((string) $request->userAgent());
+
+        if ($userAgent === '') {
+
+            $ip = app(TrafficTracker::class)->ipForStorage($request->ip());
+
+            // optional: whitelist check
+            if (!app(WhitelistIPService::class)->isWhitelisted($ip)) {
+
+                $this->blockIp($ip);
+
+                \Log::warning('TrafficSentinel: Blocked IP with empty User-Agent', [
+                    'ip' => $ip,
+                    'path' => $request->path(),
+                ]);
+
+                abort(403, 'Access denied');
+            }
+        }
+
 
         if (!config('traffic-sentinel.track_ajax', true) && $this->isAjaxLike($request)) {
             return $next($request);

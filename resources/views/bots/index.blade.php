@@ -4,32 +4,21 @@
     <div class="ts-card">
 
         <div class="p-3 border-bottom" style="border-color: rgba(255,255,255,.08)">
-            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
-                <div class="fw-semibold">
-                    <i class="bi bi-robot me-2"></i>Bot Management
-                </div>
 
-                <span class="ts-badge">
-                    <i class="bi bi-shield-check me-1"></i>
-                    {{ $bots->count() }} Bots Detected
-                </span>
-            </div>
-        </div>
-
-        <div class="p-3 border-bottom" style="border-color: rgba(255,255,255,.08)">
             <form method="GET" class="row g-2 align-items-end">
-                <div class="col-md-4">
+
+                <!-- 🔍 Search -->
+                <div class="col-lg-3 col-md-4">
                     <label class="form-label small mb-1">Bot Name</label>
-                    <input
-                            type="text"
-                            name="q"
-                            value="{{ request('q') }}"
-                            class="form-control form-control-sm"
-                            placeholder="Search bot..."
-                    >
+                    <input type="text"
+                           name="q"
+                           value="{{ request('q') }}"
+                           class="form-control form-control-sm"
+                           placeholder="Search bot...">
                 </div>
 
-                <div class="col-md-2">
+                <!-- 📊 Status -->
+                <div class="col-lg-2 col-md-3">
                     <label class="form-label small mb-1">Status</label>
                     <select name="status" class="form-select form-select-sm">
                         <option value="">All</option>
@@ -40,7 +29,8 @@
                     </select>
                 </div>
 
-                <div class="col-md-2">
+                <!-- 📅 Days -->
+                <div class="col-lg-2 col-md-3">
                     <label class="form-label small mb-1">Days</label>
                     <select name="days" class="form-select form-select-sm">
                         <option value="1" @selected((string)request('days', $days ?? 15) === '1')>1 Day</option>
@@ -50,16 +40,49 @@
                     </select>
                 </div>
 
-                <div class="col-md-4 d-flex gap-2">
+                <!-- ⚡ Actions -->
+                <div class="col-lg-5 col-md-12 d-flex flex-wrap gap-2 align-items-end">
+
+                    <!-- Filter -->
                     <button type="submit" class="btn btn-sm btn-primary">
                         <i class="bi bi-search me-1"></i>Filter
                     </button>
 
-                    <a href="{{ route('traffic-sentinel.bots.index') }}" class="btn btn-sm btn-outline-secondary">
+                    <!-- Reset -->
+                    <a href="{{ route('traffic-sentinel.bots.index') }}"
+                       class="btn btn-sm btn-outline-secondary">
                         Reset
                     </a>
+
+                    <!-- 🔴 Block All -->
+                    <button type="submit"
+                            form="blockAllForm"
+                            class="btn btn-sm btn-danger"
+                            onclick="return confirm('Block ALL bots?')">
+                        <i class="bi bi-slash-circle me-1"></i>Block All
+                    </button>
+
+                    <!-- 🟢 Unblock All -->
+                    <button type="submit"
+                            form="unblockAllForm"
+                            class="btn btn-sm btn-success"
+                            onclick="return confirm('Unblock ALL bots?')">
+                        <i class="bi bi-check-circle me-1"></i>Unblock All
+                    </button>
+
                 </div>
+
             </form>
+
+            <!-- Hidden Forms (clean approach 🔥) -->
+            <form id="blockAllForm" method="POST" action="{{ route('traffic-sentinel.bots.blockAll') }}">
+                @csrf
+            </form>
+
+            <form id="unblockAllForm" method="POST" action="{{ route('traffic-sentinel.bots.unblockAll') }}">
+                @csrf
+            </form>
+
         </div>
         <div class="table-responsive">
             <table class="table ts-table table-hover mb-0 align-middle" id="botsTable">

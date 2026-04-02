@@ -155,6 +155,12 @@ Route::group([
             ->name('traffic-sentinel.bots.monitor');
         Route::get('/bots/{bot}', [BotController::class, 'show'])
             ->name('traffic-sentinel.bots.show');
+
+        Route::post('/block-all', [BotController::class, 'blockAll'])
+            ->name('traffic-sentinel.bots.blockAll');
+
+        Route::post('/unblock-all', [BotController::class, 'unblockAll'])
+            ->name('traffic-sentinel.bots.unblockAll');
     });
 
 

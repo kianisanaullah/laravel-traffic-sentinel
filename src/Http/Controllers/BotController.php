@@ -200,4 +200,41 @@ class BotController extends Controller
             'bot', 'summary', 'ips', 'pages', 'rule', 'days', 'host'
         ));
     }
+    public function blockAll(Request $request, BotRuleService $service)
+    {
+        $bots = $this->getFilteredBots($request);
+
+        $service->blockMultipleBots($bots);
+
+        return back()->with('success', count($bots) . ' bots blocked successfully');
+    }
+
+    public function unblockAll(Request $request, BotRuleService $service)
+    {
+        $bots = $this->getFilteredBots($request);
+
+        $service->unblockMultipleBots($bots);
+
+        return back()->with('success', count($bots) . ' bots unblocked successfully');
+    }
+    private function getFilteredBots(Request $request): array
+    {
+        $q = trim((string) $request->get('q', ''));
+        $days = (int) $request->get('days', 15);
+
+        if ($days <= 0) $days = 15;
+        if ($days > 90) $days = 90;
+
+        $limitDate = now()->subDays($days);
+
+        return DB::table('traffic_sessions_bots')
+            ->where('last_seen_at', '>=', $limitDate)
+            ->when($q !== '', function ($query) use ($q) {
+                $query->where('bot_name', 'like', "%{$q}%");
+            })
+            ->selectRaw("COALESCE(bot_name,'unknown') as bot_name")
+            ->distinct()
+            ->pluck('bot_name')
+            ->toArray();
+    }
 }

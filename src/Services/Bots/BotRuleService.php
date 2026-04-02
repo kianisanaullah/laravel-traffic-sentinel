@@ -97,4 +97,54 @@ class BotRuleService
             ]
         );
     }
+    public function blockMultipleBots(array $bots)
+    {
+        if (empty($bots)) return;
+
+        $now = now();
+
+        $data = collect($bots)->map(function ($bot) use ($now) {
+            return [
+                'bot_name' => $bot === 'unknown' ? null : $bot,
+                'action' => 'block',
+                'enabled' => true,
+                'limit_per_minute' => null,
+                'limit_per_hour' => null,
+                'limit_per_day' => null,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        })->toArray();
+
+        $this->db()->table('traffic_bot_rules')->upsert(
+            $data,
+            ['bot_name'],
+            ['action', 'enabled', 'limit_per_minute', 'limit_per_hour', 'limit_per_day', 'updated_at']
+        );
+    }
+    public function unblockMultipleBots(array $bots)
+    {
+        if (empty($bots)) return;
+
+        $now = now();
+
+        $data = collect($bots)->map(function ($bot) use ($now) {
+            return [
+                'bot_name' => $bot === 'unknown' ? null : $bot,
+                'action' => 'monitor',
+                'enabled' => true,
+                'limit_per_minute' => null,
+                'limit_per_hour' => null,
+                'limit_per_day' => null,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        })->toArray();
+
+        $this->db()->table('traffic_bot_rules')->upsert(
+            $data,
+            ['bot_name'],
+            ['action', 'enabled', 'limit_per_minute', 'limit_per_hour', 'limit_per_day', 'updated_at']
+        );
+    }
 }
