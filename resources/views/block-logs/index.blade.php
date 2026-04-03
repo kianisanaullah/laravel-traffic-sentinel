@@ -110,7 +110,7 @@
                         {{-- LAST HIT --}}
                         <td class="text-nowrap">
                         <span class="ts-badge">
-                            {{ $log->last_hit_at ? \Carbon\Carbon::parse($log->last_hit_at)->format('Y-m-d H:i') : '—' }}
+                            {{ $log->updated_at ? \Carbon\Carbon::parse($log->updated_at)->format('Y-m-d H:i') : '—' }}
                         </span>
                         </td>
 
