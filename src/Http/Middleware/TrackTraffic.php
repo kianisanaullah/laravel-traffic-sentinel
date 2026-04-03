@@ -10,6 +10,7 @@ use Illuminate\Support\Str;
 use Kianisanaullah\TrafficSentinel\Services\TrafficTracker;
 use Kianisanaullah\TrafficSentinel\Services\Bots\BotProtectionService;
 use Kianisanaullah\TrafficSentinel\Services\WhitelistIPService;
+use Illuminate\Support\Facades\DB;
 
 class TrackTraffic
 {
@@ -35,22 +36,25 @@ class TrackTraffic
         if ($this->shouldExclude($request)) {
             return $next($request);
         }
-        
+        $hasUserAgentHeader = $request->headers->has('User-Agent');
+        $userAgent = $request->header('User-Agent');
+
+        if (!$hasUserAgentHeader || trim((string)$userAgent) === '') {
+            dd("No user agent provided");
+        }
+
         $userAgent = trim((string) $request->userAgent());
 
         if ($userAgent === '') {
-
+dd("No user agent provided");
             $ip = app(TrafficTracker::class)->ipForStorage($request->ip());
 
             // optional: whitelist check
             if (!app(WhitelistIPService::class)->isWhitelisted($ip)) {
 
-                $this->blockIp($ip);
+                $this->logBlockedAttempt($ip, $request, 'empty_user_agent');
 
-                \Log::warning('TrafficSentinel: Blocked IP with empty User-Agent', [
-                    'ip' => $ip,
-                    'path' => $request->path(),
-                ]);
+                $this->blockIp($ip);
 
                 abort(403, 'Access denied');
             }
@@ -74,6 +78,9 @@ class TrackTraffic
         $blockedKey = $this->blockedIpKey($ipStored);
 
         if (Cache::has($blockedKey)) {
+
+            $this->logBlockedAttempt($ipStored, $request, 'ip_already_blocked');
+
             abort(403, 'Your IP has been blocked by Traffic Sentinel.');
         }
         $host = strtolower((string)$request->getHost());
@@ -92,6 +99,11 @@ class TrackTraffic
 
         if ($rule) {
             if ($rule->action === 'block') {
+
+                $this->logBlockedAttempt($ipStored, $request, 'bot_rule_block', $botName);
+
+                $this->blockIp($ipStored); // optional but recommended
+
                 abort(403, 'Blocked');
             }
 
@@ -455,5 +467,58 @@ class TrackTraffic
             true,
             now()->addHours((int)config('traffic-sentinel.block.hours', 24))
         );
+    }
+    private function logBlockedAttempt(string $ipStored, Request $request, ?string $reason = null, ?string $botName = null): void
+    {
+        try {
+
+            $logKey = 'ts_block_log:' . $ipStored;
+
+            if (Cache::has($logKey)) {
+                return;
+            }
+
+            Cache::put($logKey, true, now()->addSeconds(5));
+
+            $key = 'ts_block_hits:' . $ipStored;
+
+            if (!Cache::has($key)) {
+                Cache::put($key, 0, now()->addMinutes(10));
+            }
+
+            $hits = Cache::increment($key);
+
+            DB::table('traffic_blocked_attempts')->insert([
+                'ip' => $ipStored,
+                'bot_name' => $botName,
+                'user_agent' => $request->userAgent(),
+                'method' => $request->method(),
+                'url' => $request->fullUrl(),
+                'path' => $request->path(),
+                'host' => $request->getHost(),
+                'reason' => $reason,
+                'hits' => $hits,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+//            if ($hits >= 10) {
+//
+//                Cache::put(
+//                    $this->blockedIpKey($ipStored),
+//                    true,
+//                    now()->addHours(24)
+//                );
+//
+//                \Log::alert('TrafficSentinel LOCKED IP', [
+//                    'ip' => $ipStored,
+//                    'hits' => $hits,
+//                ]);
+//            }
+
+        } catch (\Throwable $e) {
+            \Log::error('TrafficSentinel blocked logging failed', [
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 }
