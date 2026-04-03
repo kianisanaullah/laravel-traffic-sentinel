@@ -29,7 +29,7 @@ class BlockLogController extends Controller
             ->when($reason, fn($qBuilder) =>
             $qBuilder->where('reason', $reason)
             )
-            ->orderByDesc('last_hit_at')
+            ->orderByDesc('updated_at')
             ->paginate(50)
             ->withQueryString();
 
