@@ -226,7 +226,7 @@
     </div>
     <div class="modal fade" id="whitelistModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
-{{--            <form method="POST" action="{{ route('traffic-sentinel.whitelist.store') }}">--}}
+            <form method="POST" action="{{ route('traffic-sentinel.ips.whitelist.store') }}">
                 @csrf
 
                 <div class="modal-content ts-card">
@@ -309,7 +309,7 @@
 
                 </div>
 
-{{--            </form>--}}
+            </form>
         </div>
     </div>
 @endsection
