@@ -40,24 +40,10 @@ class TrackTraffic
         $userAgent = $request->header('User-Agent');
 
         if (!$hasUserAgentHeader || trim((string)$userAgent) === '') {
-            dd("No user agent provided");
-        }
-
-        $userAgent = trim((string) $request->userAgent());
-
-        if ($userAgent === '') {
-dd("No user agent provided");
             $ip = app(TrafficTracker::class)->ipForStorage($request->ip());
-
-            // optional: whitelist check
-            if (!app(WhitelistIPService::class)->isWhitelisted($ip)) {
-
-                $this->logBlockedAttempt($ip, $request, 'empty_user_agent');
-
-                $this->blockIp($ip);
-
-                abort(403, 'Access denied');
-            }
+            $this->logBlockedAttempt($ip, $request, 'empty_user_agent');
+            $this->blockIp($ip);
+            abort(403, 'Access denied');
         }
 
 
@@ -488,32 +474,37 @@ dd("No user agent provided");
 
             $hits = Cache::increment($key);
 
-            DB::table('traffic_blocked_attempts')->insert([
-                'ip' => $ipStored,
-                'bot_name' => $botName,
-                'user_agent' => $request->userAgent(),
-                'method' => $request->method(),
-                'url' => $request->fullUrl(),
-                'path' => $request->path(),
-                'host' => $request->getHost(),
-                'reason' => $reason,
-                'hits' => $hits,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-//            if ($hits >= 10) {
-//
-//                Cache::put(
-//                    $this->blockedIpKey($ipStored),
-//                    true,
-//                    now()->addHours(24)
-//                );
-//
-//                \Log::alert('TrafficSentinel LOCKED IP', [
-//                    'ip' => $ipStored,
-//                    'hits' => $hits,
-//                ]);
-//            }
+            $existing = DB::table('traffic_blocked_attempts')
+                ->where('ip', $ipStored)
+                ->where('path', $request->path())
+                ->where('reason', $reason)
+                ->first();
+
+            if ($existing) {
+
+                DB::table('traffic_blocked_attempts')
+                    ->where('id', $existing->id)
+                    ->update([
+                        'hits' => DB::raw('hits + 1'),
+                        'updated_at' => now(),
+                    ]);
+
+            } else {
+
+                DB::table('traffic_blocked_attempts')->insert([
+                    'ip' => $ipStored,
+                    'bot_name' => $botName,
+                    'user_agent' => $request->userAgent(),
+                    'method' => $request->method(),
+                    'url' => $request->fullUrl(),
+                    'path' => $request->path(),
+                    'host' => $request->getHost(),
+                    'reason' => $reason,
+                    'hits' => 1,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
 
         } catch (\Throwable $e) {
             \Log::error('TrafficSentinel blocked logging failed', [
