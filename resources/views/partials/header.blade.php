@@ -186,6 +186,16 @@
                     <i class="bi bi-shield-check me-1"></i>Whitelist
                 </a>
             </li>
+            <li class="nav-item">
+                <a class="nav-link @if(request()->routeIs('traffic-sentinel.block-logs.*')) active @endif"
+                   href="{{ route('traffic-sentinel.block-logs.index', [
+            'app' => $qApp,
+            'host' => $qHost,
+            'range' => $qRange
+       ]) }}">
+                    <i class="bi bi-shield-exclamation me-1"></i>Blocked Logs
+                </a>
+            </li>
         </ul>
     </div>
 </div>

@@ -8,6 +8,7 @@ use Kianisanaullah\TrafficSentinel\Http\Controllers\ExploreController;
 use Kianisanaullah\TrafficSentinel\Http\Controllers\IpLogsController;
 use Kianisanaullah\TrafficSentinel\Http\Controllers\IpRuleController;
 use Kianisanaullah\TrafficSentinel\Http\Controllers\CaptchaController;
+use Kianisanaullah\TrafficSentinel\Http\Controllers\BlockLogController;
 
 
 Route::group([
@@ -198,6 +199,8 @@ Route::group([
 
 
     });
+    Route::get('/block-logs', [BlockLogController::class, 'index'])
+        ->name('traffic-sentinel.block-logs.index');
 
 
 
