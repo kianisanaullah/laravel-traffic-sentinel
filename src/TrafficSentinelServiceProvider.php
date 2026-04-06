@@ -14,6 +14,7 @@ use Kianisanaullah\TrafficSentinel\Services\TrafficStats;
 use Kianisanaullah\TrafficSentinel\Services\TrafficStatsRange;
 use Kianisanaullah\TrafficSentinel\Services\TrafficTracker;
 use Kianisanaullah\TrafficSentinel\Services\Bots\BotRuleService;
+use Kianisanaullah\TrafficSentinel\Models\TrafficSetting;
 
 
 class TrafficSentinelServiceProvider extends ServiceProvider
@@ -21,6 +22,10 @@ class TrafficSentinelServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__ . '/../config/traffic-sentinel.php', 'traffic-sentinel');
+        $this->mergeConfigFrom(
+            __DIR__ . '/../config/traffic-sentinel-settings-schema.php',
+            'traffic-sentinel-settings-schema'
+        );
 
         /*
         |--------------------------------------------------------------------------
@@ -51,6 +56,32 @@ class TrafficSentinelServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        /*
+        |--------------------------------------------------------------------------
+        |Load DB Settings Override FIRST
+        |--------------------------------------------------------------------------
+        */
+        try {
+            $settings = cache()->remember('ts_settings_all', 3600, function () {
+                return TrafficSetting::all();
+            });
+
+            foreach ($settings as $setting) {
+                $value = $setting->value;
+
+                if ($value !== null) {
+                    config([$setting->key => $value]);
+                }
+            }
+        } catch (\Throwable $e) {
+
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | UI / Pagination
+        |--------------------------------------------------------------------------
+        */
         Paginator::useBootstrapFive();
 
         $router = $this->app['router'];
@@ -81,6 +112,7 @@ class TrafficSentinelServiceProvider extends ServiceProvider
         if (config('traffic-sentinel.dashboard.enabled', true)) {
             $this->loadRoutesFrom(__DIR__ . '/routes/web.php');
         }
+
 
         /*
         |--------------------------------------------------------------------------

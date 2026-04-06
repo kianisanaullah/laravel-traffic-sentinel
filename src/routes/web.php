@@ -202,7 +202,11 @@ Route::group([
     Route::get('/block-logs', [BlockLogController::class, 'index'])
         ->name('traffic-sentinel.block-logs.index');
 
+    Route::get('/settings', \Kianisanaullah\TrafficSentinel\Http\Controllers\SettingsController::class . '@index')
+        ->name('traffic-sentinel.settings');
 
+    Route::post('/settings', \Kianisanaullah\TrafficSentinel\Http\Controllers\SettingsController::class . '@save')
+        ->name('traffic-sentinel.settings.save');
 
 });
 

@@ -196,6 +196,12 @@
                     <i class="bi bi-shield-exclamation me-1"></i>Blocked Logs
                 </a>
             </li>
+            <li class="nav-item">
+                <a class="nav-link @if(request()->routeIs('traffic-sentinel.settings')) active @endif"
+                   href="{{ route('traffic-sentinel.settings') }}">
+                    <i class="bi bi-gear me-1"></i>Settings
+                </a>
+            </li>
         </ul>
     </div>
 </div>
