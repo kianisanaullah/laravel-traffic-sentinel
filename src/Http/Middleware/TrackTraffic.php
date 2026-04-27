@@ -365,4 +365,16 @@ class TrackTraffic
         $path = ltrim((string)$request->path(), '/');
         return str_starts_with($path, 'livewire/');
     }
+    private function sendAlertSafely($ip, $data = [])
+    {
+        try {
+            \Log::warning('Traffic Sentinel Alert', [
+                'ip' => $ip,
+                'data' => $data
+            ]);
+
+        } catch (\Throwable $e) {
+            \Log::error('TS Alert Failed: ' . $e->getMessage());
+        }
+    }
 }
