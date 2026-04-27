@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Kianisanaullah\TrafficSentinel\Models\TrafficPageview;
 use Kianisanaullah\TrafficSentinel\Models\TrafficSession;
+use Kianisanaullah\TrafficSentinel\Services\CacheService;
 
 class TrafficStatsRange
 {
@@ -225,6 +226,6 @@ class TrafficStatsRange
 
         if (! $enabled) return $fn();
 
-        return Cache::remember($prefix.$key, $ttlSeconds, $fn);
+        return app(CacheService::class)->remember($key, $ttlSeconds, $fn);
     }
 }

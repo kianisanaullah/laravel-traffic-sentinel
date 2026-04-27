@@ -80,7 +80,6 @@ return [
         */
         'cache' => [
             'enabled' => true,
-            'prefix' => 'traffic_sentinel:' . env('TRAFFIC_SENTINEL_APP_KEY', 'app') . ':',
             'ttl_hours' => 12,
         ],
 
@@ -202,8 +201,22 @@ return [
     |--------------------------------------------------------------------------
     */
     'cache' => [
+
         'enabled' => true,
+
         'prefix' => 'traffic_sentinel:',
+
+
+        'store' => 'traffic_sentinel_db',
+
+        'driver' => 'database',
+
+        'table' => 'traffic_sentinel_cache',
+
+        'connection' => null,
+
+        'ttl_minutes' => 10,
+
     ],
 
     /*

@@ -16,17 +16,38 @@
         <form method="POST" action="{{ route('traffic-sentinel.settings.save') }}">
             @csrf
 
+            {{-- SUCCESS --}}
+            @if(session('success'))
+                <div class="alert alert-success m-3">
+                    {{ session('success') }}
+                </div>
+            @endif
+
+            {{-- ERROR --}}
+            @if ($errors->any())
+                <div class="alert alert-danger m-3">
+                    Please fix the errors below.
+                </div>
+            @endif
+
             {{-- Tabs --}}
             <ul class="nav nav-tabs px-3 pt-3" role="tablist">
                 @foreach($schema ?? [] as $tab => $fields)
-                    @php $tabId = 'tab-'.Str::slug($tab); @endphp
+                    @php
+                        $tabId = 'tab-'.Str::slug($tab);
+                        $hasError = collect($fields)->keys()->some(fn($k) => $errors->has($k));
+                    @endphp
 
                     <li class="nav-item">
                         <button type="button"
-                                class="nav-link {{ $loop->first ? 'active' : '' }}"
+                                class="nav-link {{ $loop->first || $hasError ? 'active' : '' }}"
                                 data-bs-toggle="tab"
                                 data-bs-target="#{{ $tabId }}">
                             {{ $tab }}
+
+                            @if($hasError)
+                                <span class="text-danger ms-1">●</span>
+                            @endif
                         </button>
                     </li>
                 @endforeach
@@ -36,24 +57,35 @@
             <div class="tab-content p-3">
 
                 @foreach($schema ?? [] as $tab => $fields)
-                    @php $tabId = 'tab-'.Str::slug($tab); @endphp
+                    @php
+                        $tabId = 'tab-'.Str::slug($tab);
+                        $hasError = collect($fields)->keys()->some(fn($k) => $errors->has($k));
+                    @endphp
 
-                    <div class="tab-pane fade {{ $loop->first ? 'show active' : '' }}"
+                    <div class="tab-pane fade {{ $loop->first || $hasError ? 'show active' : '' }}"
                          id="{{ $tabId }}">
 
                         @foreach($fields as $key => $meta)
 
                             @php
-                                $configKey = str_replace('traffic-sentinel.', '', $key);
-                                $value = data_get(config('traffic-sentinel'), $configKey);
+                                // 🔥 SAFE INPUT NAME (CRITICAL FIX)
+                                $inputName = str_replace(['.', '-'], ['__', '_'], $key);
 
-                                // ✅ FIXED (no DB query)
+                                $configKey = str_replace('traffic-sentinel.', '', $key);
+
+                                $value = old(
+                                    $inputName,
+                                    $settingsMap[$key] ?? data_get(config('traffic-sentinel'), $configKey)
+                                );
+
                                 $isDbOverride = array_key_exists($key, $settingsMap);
 
                                 $label = Str::of($configKey)
                                     ->replace('.', ' ')
                                     ->replace('_', ' ')
                                     ->title();
+
+                                $hasFieldError = $errors->has($inputName);
                             @endphp
 
                             <div class="mb-3">
@@ -72,33 +104,40 @@
                                 {{-- BOOLEAN --}}
                                 @if($meta['type'] === 'boolean')
                                     <div class="form-check form-switch">
-                                        <input type="hidden" name="{{ $key }}" value="0"> {{-- 🔥 FIX --}}
+                                        <input type="hidden" name="{{ $inputName }}" value="0">
                                         <input class="form-check-input"
                                                type="checkbox"
-                                               name="{{ $key }}"
+                                               name="{{ $inputName }}"
                                                value="1"
-                                                {{ $value ? 'checked' : '' }}>
+                                                {{ (string)$value === '1' ? 'checked' : '' }}>
                                     </div>
 
                                     {{-- NUMBER --}}
                                 @elseif($meta['type'] === 'number')
                                     <input type="number"
-                                           name="{{ $key }}"
+                                           name="{{ $inputName }}"
                                            value="{{ $value }}"
-                                           class="form-control">
+                                           class="form-control {{ $hasFieldError ? 'is-invalid' : '' }}">
 
                                     {{-- JSON --}}
                                 @elseif($meta['type'] === 'json')
-                                    <textarea name="{{ $key }}"
-                                              class="form-control font-monospace"
-                                              rows="4">{{ is_array($value) ? json_encode($value, JSON_PRETTY_PRINT) : '' }}</textarea>
+                                    <textarea name="{{ $inputName }}"
+                                              class="form-control font-monospace {{ $hasFieldError ? 'is-invalid' : '' }}"
+                                              rows="4">{{ is_array($value) ? json_encode($value, JSON_PRETTY_PRINT) : $value }}</textarea>
 
                                     {{-- TEXT --}}
                                 @else
                                     <input type="text"
-                                           name="{{ $key }}"
+                                           name="{{ $inputName }}"
                                            value="{{ $value }}"
-                                           class="form-control">
+                                           class="form-control {{ $hasFieldError ? 'is-invalid' : '' }}">
+                                @endif
+
+                                {{-- ERROR --}}
+                                @if($hasFieldError)
+                                    <div class="invalid-feedback d-block">
+                                        {{ $errors->first($inputName) }}
+                                    </div>
                                 @endif
 
                             </div>

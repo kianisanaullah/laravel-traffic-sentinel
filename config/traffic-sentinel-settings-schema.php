@@ -47,10 +47,6 @@ return [
         'traffic-sentinel.exclude.user_agents' => ['type' => 'json'],
     ],
 
-    'Dashboard' => [
-        'traffic-sentinel.dashboard.enabled' => ['type' => 'boolean'],
-    ],
-
     'Cookie' => [
         'traffic-sentinel.cookie.name' => ['type' => 'text'],
         'traffic-sentinel.cookie.minutes' => ['type' => 'number'],
@@ -71,19 +67,19 @@ return [
         'traffic-sentinel.database.connection' => ['type' => 'text'],
     ],
 
-    'Advanced' => [
-        'traffic-sentinel.partitioning.enabled' => ['type' => 'boolean'],
-        'traffic-sentinel.partitioning.months_past' => ['type' => 'number'],
-        'traffic-sentinel.partitioning.months_future' => ['type' => 'number'],
-        'traffic-sentinel.prune.keep_days' => ['type' => 'number'],
-    ],
-
-    'Alerts' => [
-        'traffic-sentinel.alerts.enabled' => ['type' => 'boolean'],
-        'traffic-sentinel.alerts.threshold' => ['type' => 'number'],
-        'traffic-sentinel.alerts.window_seconds' => ['type' => 'number'],
-        'traffic-sentinel.alerts.email' => ['type' => 'text'],
-    ],
+//    'Advanced' => [
+//        'traffic-sentinel.partitioning.enabled' => ['type' => 'boolean'],
+//        'traffic-sentinel.partitioning.months_past' => ['type' => 'number'],
+//        'traffic-sentinel.partitioning.months_future' => ['type' => 'number'],
+//        'traffic-sentinel.prune.keep_days' => ['type' => 'number'],
+//    ],
+//
+//    'Alerts' => [
+//        'traffic-sentinel.alerts.enabled' => ['type' => 'boolean'],
+//        'traffic-sentinel.alerts.threshold' => ['type' => 'number'],
+//        'traffic-sentinel.alerts.window_seconds' => ['type' => 'number'],
+//        'traffic-sentinel.alerts.email' => ['type' => 'text'],
+//    ],
 
     'Captcha' => [
         'traffic-sentinel.captcha.enabled' => ['type' => 'boolean'],

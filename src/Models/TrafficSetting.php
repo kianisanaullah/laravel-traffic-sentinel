@@ -19,7 +19,7 @@ class TrafficSetting extends Model
         $this->connection = config('traffic-sentinel.database.connection', 'mysql');
     }
 
-    protected $casts = [
-        'value' => 'array',
-    ];
+//    protected $casts = [
+//        'value' => 'array',
+//    ];
 }

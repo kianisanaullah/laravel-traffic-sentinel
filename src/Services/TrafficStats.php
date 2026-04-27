@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Kianisanaullah\TrafficSentinel\Models\TrafficPageview;
 use Kianisanaullah\TrafficSentinel\Models\TrafficSession;
+use Kianisanaullah\TrafficSentinel\Services\CacheService;
 
 class TrafficStats
 {
@@ -283,13 +284,20 @@ class TrafficStats
         });
     }
 
+
+
     protected function cached(string $key, int $ttlSeconds, \Closure $fn)
     {
         $enabled = (bool) config('traffic-sentinel.cache.enabled', true);
-        $prefix  = (string) config('traffic-sentinel.cache.prefix', 'traffic_sentinel:');
 
-        if (! $enabled) return $fn();
+        if (! $enabled) {
+            return $fn();
+        }
 
-        return Cache::remember($prefix.$key, $ttlSeconds, $fn);
+        /** @var CacheService $cache */
+        $cache = app(CacheService::class);
+
+        // CacheService already handles prefix internally
+        return $cache->remember($key, $ttlSeconds, $fn);
     }
 }

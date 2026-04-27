@@ -9,10 +9,11 @@ use Kianisanaullah\TrafficSentinel\Models\TrafficPageviewHuman;
 use Kianisanaullah\TrafficSentinel\Models\TrafficPageviewBot;
 use Kianisanaullah\TrafficSentinel\Models\TrafficSessionHuman;
 use Kianisanaullah\TrafficSentinel\Models\TrafficSessionBot;
+use Kianisanaullah\TrafficSentinel\Services\CacheService;
 
 class DashboardController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request, CacheService $cache)
     {
         $range = $request->get('range', 'today');
         $days  = $range === '7' ? 7 : ($range === '30' ? 30 : 1);
@@ -30,19 +31,27 @@ class DashboardController extends Controller
         $end   = now();
         $start = $days === 1 ? now()->startOfDay() : now()->subDays($days)->startOfDay();
 
-        // ✅ Host/App lists should not depend on bots toggle; use humans table for speed
-        $hosts = Cache::remember('ts_hosts_list_v3', 3600, function () {
+        $hosts = $cache->remember('hosts:list', 60, function () {
             return TrafficPageviewHuman::query()
-                ->whereNotNull('host')->where('host', '!=', '')
-                ->distinct()->orderBy('host')
-                ->pluck('host')->all();
+                ->whereNotNull('host')
+                ->where('host', '!=', '')
+                ->select('host')
+                ->groupBy('host')
+                ->orderBy('host')
+                ->pluck('host')
+                ->all();
         });
 
-        $apps = Cache::remember('ts_apps_list_v3', 3600, function () {
+        $apps = $cache->remember('apps:list', 60, function () {
+
             return TrafficPageviewHuman::query()
-                ->whereNotNull('app_key')->where('app_key', '!=', '')
-                ->distinct()->orderBy('app_key')
-                ->pluck('app_key')->all();
+                ->whereNotNull('app_key')
+                ->where('app_key', '!=', '')
+                ->select('app_key')
+                ->groupBy('app_key')
+                ->orderBy('app_key')
+                ->pluck('app_key')
+                ->all();
         });
 
         $minutes = (int) config('traffic-sentinel.online_minutes', 5);

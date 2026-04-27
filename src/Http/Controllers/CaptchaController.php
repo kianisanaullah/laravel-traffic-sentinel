@@ -7,6 +7,7 @@ use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Kianisanaullah\TrafficSentinel\Services\TrafficTracker;
+use Kianisanaullah\TrafficSentinel\Services\CacheService;
 use Illuminate\Support\Facades\Mail;
 
 class CaptchaController extends Controller
@@ -24,7 +25,7 @@ class CaptchaController extends Controller
     }
 
 
-    public function verify(Request $request, TrafficTracker $tracker)
+    public function verify(Request $request, TrafficTracker $tracker, CacheService $cache)
     {
         $request->validate([
             'cf-turnstile-response' => ['required', 'string'],
@@ -52,34 +53,28 @@ class CaptchaController extends Controller
 
         $ipStored = $tracker->ipForStorage($request->ip());
 
-        // CAPTCHA FAILED
+        // ❌ CAPTCHA FAILED
         if (!($result['success'] ?? false)) {
 
             if ($ipStored) {
 
-                $failKey = 'ts_captcha_fail:' . $ipStored;
+                $failKey = 'captcha_fail:' . $ipStored;
 
-                $fails = Cache::increment($failKey);
-
-                if ($fails == 1) {
-                    Cache::put($failKey, 1, now()->addMinutes(30));
-                }
+                // ✅ SAFE increment (TTL handled)
+                $fails = $cache->increment($failKey, 30);
 
                 $limit = (int) config('traffic-sentinel.captcha.fail_limit', 3);
 
                 if ($fails >= $limit) {
 
-                    $blockKey = 'ts_ip_blocked:' . $ipStored;
+                    $blockKey = 'ip_blocked:' . $ipStored;
 
-                    Cache::put(
+                    $cache->setFlag(
                         $blockKey,
-                        true,
-                        now()->addHours(
-                            (int) config('traffic-sentinel.captcha.block_hours', 24)
-                        )
+                        (int) config('traffic-sentinel.captcha.block_hours', 24) * 60
                     );
 
-                    Cache::forget($failKey);
+                    $cache->reset($failKey);
 
                     $this->sendCaptchaBlockAlert($ipStored);
 
@@ -92,19 +87,16 @@ class CaptchaController extends Controller
             ]);
         }
 
-        // CAPTCHA SUCCESS
+        // ✅ CAPTCHA SUCCESS
         if ($ipStored) {
 
-            Cache::put(
-                'ts_captcha_passed:' . $ipStored,
-                true,
-                now()->addMinutes(
-                    (int) config('traffic-sentinel.captcha.pass_minutes', 30)
-                )
+            $cache->setFlag(
+                'captcha_passed:' . $ipStored,
+                (int) config('traffic-sentinel.captcha.pass_minutes', 30)
             );
 
-            Cache::forget('ts_captcha_required:' . $ipStored);
-            Cache::forget('ts_captcha_fail:' . $ipStored);
+            $cache->reset('captcha_required:' . $ipStored);
+            $cache->reset('captcha_fail:' . $ipStored);
         }
 
         $redirectTo = $request->input('redirect_to')
@@ -114,7 +106,6 @@ class CaptchaController extends Controller
 
         return redirect($redirectTo);
     }
-
     private function sendCaptchaBlockAlert(string $ip)
     {
         $emails = collect(explode(',', (string)config('traffic-sentinel.alerts.email')))

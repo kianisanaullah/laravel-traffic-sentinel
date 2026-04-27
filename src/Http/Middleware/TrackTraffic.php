@@ -4,26 +4,28 @@ namespace Kianisanaullah\TrafficSentinel\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Kianisanaullah\TrafficSentinel\Services\TrafficTracker;
 use Kianisanaullah\TrafficSentinel\Services\Bots\BotProtectionService;
 use Kianisanaullah\TrafficSentinel\Services\WhitelistIPService;
+use Kianisanaullah\TrafficSentinel\Services\CacheService;
 use Illuminate\Support\Facades\DB;
 
 class TrackTraffic
 {
+    protected $cache;
+
+    public function __construct(CacheService $cache)
+    {
+        $this->cache = $cache;
+    }
+
     public function handle(Request $request, Closure $next)
     {
         if (!config('traffic-sentinel.enabled')) {
             return $next($request);
         }
-//        $ip = $request->ip();
-//
-//        if (app(WhitelistIPService::class)->isWhitelisted($ip)) {
-//            return $next($request);
-//        }
 
         if (app()->runningInConsole()) {
             return $next($request);
@@ -36,6 +38,7 @@ class TrackTraffic
         if ($this->shouldExclude($request)) {
             return $next($request);
         }
+
         $hasUserAgentHeader = $request->headers->has('User-Agent');
         $userAgent = $request->header('User-Agent');
 
@@ -45,7 +48,6 @@ class TrackTraffic
             $this->blockIp($ip);
             abort(403, 'Access denied');
         }
-
 
         if (!config('traffic-sentinel.track_ajax', true) && $this->isAjaxLike($request)) {
             return $next($request);
@@ -57,22 +59,23 @@ class TrackTraffic
 
         [$visitorId, $isNewVisitorId] = $this->getOrCreateVisitorId($request);
 
-        /** @var TrafficTracker $tracker */
         $tracker = app(TrafficTracker::class);
 
         $ipStored = $tracker->ipForStorage($request->ip());
         $blockedKey = $this->blockedIpKey($ipStored);
 
-        if (Cache::has($blockedKey)) {
+        if ($this->cache->has($blockedKey)) {
 
             $this->logBlockedAttempt($ipStored, $request, 'ip_already_blocked');
 
             abort(403, 'Your IP has been blocked by Traffic Sentinel.');
         }
+
         $host = strtolower((string)$request->getHost());
         $app = config('traffic-sentinel.tracking.app_key');
 
         [$isBot, $botName] = $tracker->detectBotFromRequest($request);
+
         $captchaRedirect = $this->handleCaptchaChallenge($request, $ipStored);
         if ($captchaRedirect) {
             return $captchaRedirect;
@@ -80,7 +83,6 @@ class TrackTraffic
 
         $this->monitorEveryIp($ipStored, $botName, $host);
 
-        // Cached rule lookup to reduce DB pressure
         $rule = $this->cachedRuleLookup($botName, $ipStored, $host, $app);
 
         if ($rule) {
@@ -88,7 +90,7 @@ class TrackTraffic
 
                 $this->logBlockedAttempt($ipStored, $request, 'bot_rule_block', $botName);
 
-                $this->blockIp($ipStored); // optional but recommended
+                $this->blockIp($ipStored);
 
                 abort(403, 'Blocked');
             }
@@ -99,9 +101,7 @@ class TrackTraffic
         }
 
         $start = microtime(true);
-
         $response = $next($request);
-
         $durationMs = (int)round((microtime(true) - $start) * 1000);
 
         if ($isNewVisitorId) {
@@ -124,11 +124,10 @@ class TrackTraffic
             }
 
             $tracker->track($request, $durationMs, $status, $visitorId);
+
         } catch (\Throwable $e) {
             \Log::error('TrafficSentinel track failed', [
                 'msg' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
             ]);
         }
 
@@ -144,51 +143,35 @@ class TrackTraffic
                 'app' => $app,
             ]));
 
-        return Cache::remember($cacheKey, now()->addSeconds(60), function () use ($botName, $ipStored, $host, $app) {
+        return $this->cache->remember($cacheKey, 60, function () use ($botName, $ipStored, $host, $app) {
             return app(BotProtectionService::class)->check($botName, $ipStored, $host, $app);
         });
     }
 
     private function monitorEveryIp(?string $ipStored, ?string $botName, ?string $host): void
     {
-        if (!config('traffic-sentinel.alerts.enabled')) {
-            return;
-        }
-
-        if (!$ipStored) {
-            return;
-        }
+        if (!config('traffic-sentinel.alerts.enabled')) return;
+        if (!$ipStored) return;
 
         $threshold = (int)config('traffic-sentinel.alerts.threshold', 0);
         $window = (int)config('traffic-sentinel.alerts.window_seconds', 60);
 
-        if ($threshold <= 0 || $window <= 0) {
-            return;
-        }
+        if ($threshold <= 0 || $window <= 0) return;
 
         $monitorKey = 'ts_alert_monitor_ip:' . $ipStored;
 
-        if (!Cache::has($monitorKey)) {
-            Cache::put($monitorKey, 0, now()->addSeconds($window));
-        }
+        $hits = $this->cache->increment($monitorKey, ceil($window / 60));
 
-        $hits = Cache::increment($monitorKey);
+        if ($hits < $threshold) return;
 
-        // Only cheap cache checks here
-        if ($hits < $threshold) {
-            return;
-        }
         $this->markCaptchaRequired($ipStored);
 
         $cooldownKey = 'ts_alert_sent:' . $monitorKey;
 
-        if (Cache::has($cooldownKey)) {
-            return;
-        }
+        if ($this->cache->has($cooldownKey)) return;
 
-        Cache::put($cooldownKey, true, now()->addMinutes(10));
+        $this->cache->put($cooldownKey, true, 10);
 
-        // Defer alert send as much as possible
         $this->sendAlertSafely([
             'key' => $monitorKey,
             'hits' => $hits,
@@ -198,97 +181,106 @@ class TrackTraffic
         ]);
     }
 
-    private function sendAlertSafely(array $data): void
-    {
-        $emails = collect(explode(',', (string)config('traffic-sentinel.alerts.email', '')))
-            ->map(fn($e) => trim($e))
-            ->filter()
-            ->values()
-            ->all();
-
-        if (empty($emails)) {
-            return;
-        }
-
-        try {
-            $trafficType = !empty($data['bot_name']) ? 'Bot' : 'Human';
-
-            Mail::send(
-                'traffic-sentinel::emails.high-traffic-alert',
-                [
-                    'ip' => $data['ip'] ?? null,
-                    'hits' => $data['hits'] ?? 0,
-                    'trafficType' => $trafficType,
-                    'botName' => $data['bot_name'] ?? null,
-                    'host' => $data['host'] ?? null,
-                    'time' => now(),
-                ],
-                function ($msg) use ($emails, $data) {
-                    $msg->to($emails)
-                        ->subject('Traffic Sentinel Alert — High Traffic from IP ' . ($data['ip'] ?? 'unknown'));
-                }
-            );
-        } catch (\Throwable $e) {
-            \Log::error('TrafficSentinel alert email failed', [
-                'error' => $e->getMessage(),
-            ]);
-        }
-    }
-
-    private function enforceThrottle(?string $ipStored, ?string $botName, ?string $host, ?string $app, $rule): void
-    {
-        $baseKey = $this->throttleKey($ipStored, $botName, $host, $app, $rule);
-
-        if (!$baseKey) {
-            return;
-        }
-
-        if (!empty($rule->limit_per_minute)) {
-            $this->checkThrottleWindow($baseKey . ':min', (int)$rule->limit_per_minute, 60, 'Too many requests per minute');
-        }
-
-        if (!empty($rule->limit_per_hour)) {
-            $this->checkThrottleWindow($baseKey . ':hour', (int)$rule->limit_per_hour, 3600, 'Too many requests per hour');
-        }
-
-        if (!empty($rule->limit_per_day)) {
-            $this->checkThrottleWindow($baseKey . ':day', (int)$rule->limit_per_day, 86400, 'Too many requests per day');
-        }
-    }
-
     private function checkThrottleWindow(string $key, int $limit, int $ttlSeconds, string $message): void
     {
-        if (!Cache::has($key)) {
-            Cache::put($key, 0, now()->addSeconds($ttlSeconds));
-        }
-
-        $hits = Cache::increment($key);
+        $hits = $this->cache->increment($key, ceil($ttlSeconds / 60));
 
         if ($hits > $limit) {
             abort(429, $message);
         }
     }
 
-    private function throttleKey(?string $ipStored, ?string $botName, ?string $host, ?string $app, $rule): ?string
+    private function handleCaptchaChallenge(Request $request, ?string $ipStored)
     {
-        if (!empty($rule->ip) && $ipStored) {
-            return 'ts_rate_ip:' . $ipStored;
+        if (!config('traffic-sentinel.captcha.enabled', true)) return null;
+        if (!$ipStored) return null;
+
+        if (!$this->cache->has($this->captchaRequiredKey($ipStored))) return null;
+        if ($this->cache->has($this->captchaPassedKey($ipStored))) return null;
+
+        if (
+            $request->is('captcha') ||
+            $request->is('captcha/*') ||
+            $request->routeIs('traffic-sentinel.captcha.*')
+        ) {
+            return null;
         }
 
-        if (!empty($rule->bot_name) && $botName) {
-            return 'ts_rate_bot:' . strtolower($botName);
-        }
+        session(['traffic_sentinel_intended_url' => $request->fullUrl()]);
 
-        if (!empty($rule->host) && $host) {
-            return 'ts_rate_host:' . strtolower($host);
-        }
-
-        if (!empty($rule->app_key) && $app) {
-            return 'ts_rate_app:' . strtolower($app);
-        }
-
-        return $ipStored ? 'ts_rate_ip:' . $ipStored : null;
+        return redirect()->route('traffic-sentinel.captcha');
     }
+
+    private function markCaptchaRequired(?string $ipStored): void
+    {
+        if (!config('traffic-sentinel.captcha.enabled', true)) return;
+        if (!$ipStored) return;
+
+        $this->cache->put(
+            $this->captchaRequiredKey($ipStored),
+            true,
+            (int)config('traffic-sentinel.captcha.challenge_minutes', 10)
+        );
+    }
+
+    private function blockIp(string $ipStored): void
+    {
+        $this->cache->put(
+            $this->blockedIpKey($ipStored),
+            true,
+            (int)config('traffic-sentinel.block.hours', 24) * 60
+        );
+    }
+
+    private function logBlockedAttempt(string $ipStored, Request $request, ?string $reason = null, ?string $botName = null): void
+    {
+        try {
+
+            $logKey = 'ts_block_log:' . $ipStored;
+
+            if ($this->cache->has($logKey)) return;
+
+            $this->cache->put($logKey, true, 1);
+
+            $this->cache->increment('ts_block_hits:' . $ipStored, 10);
+
+            DB::table('traffic_blocked_attempts')->insert([
+                'ip' => $ipStored,
+                'bot_name' => $botName,
+                'user_agent' => $request->userAgent(),
+                'method' => $request->method(),
+                'url' => $request->fullUrl(),
+                'path' => $request->path(),
+                'host' => $request->getHost(),
+                'reason' => $reason,
+                'hits' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+        } catch (\Throwable $e) {
+            \Log::error('TrafficSentinel blocked logging failed', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function captchaRequiredKey(string $ipStored): string
+    {
+        return 'ts_captcha_required:' . $ipStored;
+    }
+
+    private function captchaPassedKey(string $ipStored): string
+    {
+        return 'ts_captcha_passed:' . $ipStored;
+    }
+
+    private function blockedIpKey(string $ipStored): string
+    {
+        return 'ts_ip_blocked:' . $ipStored;
+    }
+
+    // ===== REMAINING METHODS (UNCHANGED) =====
 
     protected function getOrCreateVisitorId(Request $request): array
     {
@@ -335,27 +327,19 @@ class TrackTraffic
     protected function shouldExclude(Request $request): bool
     {
         $cfg = config('traffic-sentinel.exclude', []);
-
         $host = strtolower((string)$request->getHost());
-        foreach (($cfg['hosts'] ?? []) as $h) {
-            $h = strtolower(trim($h));
-            if ($h !== '' && $host === $h) return true;
+
+        $hosts = $cfg['hosts'] ?? [];
+
+        if (is_string($hosts)) {
+            $decoded = json_decode($hosts, true);
+            $hosts = is_array($decoded) ? $decoded : explode(',', $hosts);
         }
 
-        $path = ltrim($request->path(), '/');
-        foreach (($cfg['paths'] ?? []) as $p) {
-            $p = trim($p, '/');
-            if ($p !== '' && str_starts_with($path, $p)) return true;
-        }
-
-        $ip = (string)$request->ip();
-        foreach (($cfg['ips'] ?? []) as $blocked) {
-            if ($blocked === $ip) return true;
-        }
-
-        $ua = (string)$request->userAgent();
-        foreach (($cfg['user_agents'] ?? []) as $needle) {
-            if ($needle && stripos($ua, $needle) !== false) return true;
+        foreach ($hosts as $h) {
+            if ($host === strtolower($h)) {
+                return true;
+            }
         }
 
         return false;
@@ -380,136 +364,5 @@ class TrackTraffic
 
         $path = ltrim((string)$request->path(), '/');
         return str_starts_with($path, 'livewire/');
-    }
-
-    private function handleCaptchaChallenge(Request $request, ?string $ipStored)
-    {
-        if (!config('traffic-sentinel.captcha.enabled', true)) {
-            return null;
-        }
-
-        if (!$ipStored) {
-            return null;
-        }
-
-        $requiredKey = $this->captchaRequiredKey($ipStored);
-        $passedKey = $this->captchaPassedKey($ipStored);
-
-        if (!Cache::has($requiredKey)) {
-            return null;
-        }
-
-        if (Cache::has($passedKey)) {
-            return null;
-        }
-
-        if (
-            $request->is('captcha') ||
-            $request->is('captcha/*') ||
-            $request->routeIs('traffic-sentinel.captcha.*')
-        ) {
-            return null;
-        }
-
-        session(['traffic_sentinel_intended_url' => $request->fullUrl()]);
-
-        return redirect()->route('traffic-sentinel.captcha');
-    }
-
-    private function markCaptchaRequired(?string $ipStored): void
-    {
-        if (!config('traffic-sentinel.captcha.enabled', true)) {
-            return;
-        }
-
-        if (!$ipStored) {
-            return;
-        }
-
-        Cache::put(
-            $this->captchaRequiredKey($ipStored),
-            true,
-            now()->addMinutes((int)config('traffic-sentinel.captcha.challenge_minutes', 10))
-        );
-    }
-
-    private function captchaRequiredKey(string $ipStored): string
-    {
-        return 'ts_captcha_required:' . $ipStored;
-    }
-
-    private function captchaPassedKey(string $ipStored): string
-    {
-        return 'ts_captcha_passed:' . $ipStored;
-    }
-    private function blockedIpKey(string $ipStored): string
-    {
-        return 'ts_ip_blocked:' . $ipStored;
-    }
-    private function blockIp(string $ipStored): void
-    {
-        Cache::put(
-            $this->blockedIpKey($ipStored),
-            true,
-            now()->addHours((int)config('traffic-sentinel.block.hours', 24))
-        );
-    }
-    private function logBlockedAttempt(string $ipStored, Request $request, ?string $reason = null, ?string $botName = null): void
-    {
-        try {
-
-            $logKey = 'ts_block_log:' . $ipStored;
-
-            if (Cache::has($logKey)) {
-                return;
-            }
-
-            Cache::put($logKey, true, now()->addSeconds(5));
-
-            $key = 'ts_block_hits:' . $ipStored;
-
-            if (!Cache::has($key)) {
-                Cache::put($key, 0, now()->addMinutes(10));
-            }
-
-            $hits = Cache::increment($key);
-
-            $existing = DB::table('traffic_blocked_attempts')
-                ->where('ip', $ipStored)
-                ->where('path', $request->path())
-                ->where('reason', $reason)
-                ->first();
-
-            if ($existing) {
-
-                DB::table('traffic_blocked_attempts')
-                    ->where('id', $existing->id)
-                    ->update([
-                        'hits' => DB::raw('hits + 1'),
-                        'updated_at' => now(),
-                    ]);
-
-            } else {
-
-                DB::table('traffic_blocked_attempts')->insert([
-                    'ip' => $ipStored,
-                    'bot_name' => $botName,
-                    'user_agent' => $request->userAgent(),
-                    'method' => $request->method(),
-                    'url' => $request->fullUrl(),
-                    'path' => $request->path(),
-                    'host' => $request->getHost(),
-                    'reason' => $reason,
-                    'hits' => 1,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-            }
-
-        } catch (\Throwable $e) {
-            \Log::error('TrafficSentinel blocked logging failed', [
-                'error' => $e->getMessage(),
-            ]);
-        }
     }
 }

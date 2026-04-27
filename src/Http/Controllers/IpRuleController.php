@@ -7,6 +7,7 @@ use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\DB;
 use Kianisanaullah\TrafficSentinel\Services\Bots\BotRuleService;
 use Kianisanaullah\TrafficSentinel\Services\RuntimeIpLookupService;
+use Kianisanaullah\TrafficSentinel\Services\CacheService;
 
 class IpRuleController extends Controller
 {
@@ -217,7 +218,7 @@ class IpRuleController extends Controller
 
         return view('traffic-sentinel::ips.whitelist', compact('ips'));
     }
-    public function whitelist_store(Request $request)
+    public function whitelist_store(Request $request, CacheService $cache)
     {
         $request->validate([
             'ip' => ['required', 'string', function ($attr, $value, $fail) {
@@ -262,22 +263,19 @@ class IpRuleController extends Controller
             'updated_at' => now()
         ]);
 
-        Cache::forget('ts_whitelist_all');
+        $cache->forget('ts_whitelist_all');
 
         return back()->with('success', $type === 'subnet'
             ? 'Subnet added to whitelist'
             : 'IP added to whitelist');
     }
-    public function whitelist_destroy($id)
+    public function whitelist_destroy($id, CacheService $cache)
     {
-        $row = DB::table('traffic_whitelist_ips')->where('id',$id)->first();
-
-        if($row){
-            Cache::forget('ts_whitelist_'.$row->ip);
+        $row = DB::table('traffic_whitelist_ips')->where('id', $id)->first();
+        if ($row) {
+            $cache->forget('ts_whitelist_' . $row->ip);
         }
-
-        DB::table('traffic_whitelist_ips')->where('id',$id)->delete();
-
-        return back()->with('success','Whitelist entry removed');
+        DB::table('traffic_whitelist_ips')->where('id', $id)->delete();
+        return back()->with('success', 'Whitelist entry removed');
     }
 }

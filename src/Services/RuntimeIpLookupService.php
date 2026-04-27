@@ -4,20 +4,21 @@ namespace Kianisanaullah\TrafficSentinel\Services;
 
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
+use Kianisanaullah\TrafficSentinel\Services\CacheService;
 
 
 class RuntimeIpLookupService
 {
     /** @var array<string, array{name:string,flag:string}>|null */
     protected static $countryMeta = null;
-
+    protected $cache;
     protected string $basePath;
 
-    public function __construct()
+    public function __construct(CacheService $cache)
     {
         $disk = config('traffic-sentinel.ip_lookup.storage.disk', 'local');
         $path = config('traffic-sentinel.ip_lookup.storage.path', 'traffic-sentinel/ipdata');
-
+        $this->cache = $cache;
         $this->basePath = Storage::disk($disk)->path($path);
     }
 
@@ -58,9 +59,9 @@ class RuntimeIpLookupService
             ];
         }
 
-        return Cache::remember(
+        return $this->cache->remember(
             'ts:iplookup:' . $ip,
-            now()->addHours(12),
+            43200,
             function () use ($ip) {
                 $country = $this->lookupCountry($ip);
                 $asn     = $this->lookupAsn($ip);
