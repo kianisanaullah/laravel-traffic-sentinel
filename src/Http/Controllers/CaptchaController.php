@@ -95,8 +95,8 @@ class CaptchaController extends Controller
                 (int) config('traffic-sentinel.captcha.pass_minutes', 30)
             );
 
-            $cache->reset('captcha_required:' . $ipStored);
-            $cache->reset('captcha_fail:' . $ipStored);
+            $cache->reset('ts_captcha_required:' . $ipStored);
+            $cache->reset('ts_captcha_fail:' . $ipStored);
         }
 
         $redirectTo = $request->input('redirect_to')
