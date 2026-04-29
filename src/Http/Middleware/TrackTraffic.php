@@ -263,6 +263,42 @@ class TrackTraffic
         try {
 
             $logKey = 'ts_block_log:' . $ipStored;
+            $trafficType = !empty($data['bot_name']) ? 'Bot' : 'Human';
+            $emails = config('traffic-sentinel.alerts.email', []);
+
+            // 🔥 Normalize emails
+            if (is_string($emails)) {
+
+                // try JSON decode first
+                $decoded = json_decode($emails, true);
+
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    $emails = $decoded;
+                } else {
+                    // fallback: comma separated
+                    $emails = array_map('trim', explode(',', $emails));
+                }
+            }
+
+            if (empty($emails)) {
+                return; // no recipients
+            }
+
+            Mail::send(
+                'traffic-sentinel::emails.high-traffic-alert',
+                [
+                    'ip' => $data['ip'] ?? null,
+                    'hits' => $data['hits'] ?? 0,
+                    'trafficType' => $trafficType,
+                    'botName' => $data['bot_name'] ?? null,
+                    'host' => $data['host'] ?? null,
+                    'time' => now(),
+                ],
+                function ($msg) use ($emails, $data) {
+                    $msg->to($emails)
+                        ->subject('Traffic Sentinel Alert — High Traffic from IP ' . ($data['ip'] ?? 'unknown'));
+                }
+            );
 
             if ($this->cache->has($logKey)) return;
 
@@ -499,8 +535,23 @@ class TrackTraffic
             if (empty($emails)) {
                 return; // no recipients
             }
-            \Mail::to($emails)
-                ->send(new \App\Mail\TrafficAlertMail($ip, $data));
+            $trafficType = !empty($data['bot_name']) ? 'Bot' : 'Human';
+
+            Mail::send(
+                'traffic-sentinel::emails.high-traffic-alert',
+                [
+                    'ip' => $ip,
+                    'hits' => $data['hits'] ?? 0,
+                    'trafficType' => $trafficType,
+                    'botName' => $data['bot_name'] ?? null,
+                    'host' => $data['host'] ?? null,
+                    'time' => now(),
+                ],
+                function ($msg) use ($emails, $data) {
+                    $msg->to($emails)
+                        ->subject('Traffic Sentinel Alert — High Traffic from IP ' . ($data['ip'] ?? 'unknown'));
+                }
+            );
 
         } catch (\Throwable $e) {
 
