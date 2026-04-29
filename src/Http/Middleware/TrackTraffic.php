@@ -353,17 +353,102 @@ class TrackTraffic
     protected function shouldExclude(Request $request): bool
     {
         $cfg = config('traffic-sentinel.exclude', []);
-        $host = strtolower((string)$request->getHost());
 
-        $hosts = $cfg['hosts'] ?? [];
+        $ip   = (string) $request->ip();
+        $host = strtolower((string) $request->getHost());
+        $path = ltrim((string) $request->path(), '/');
+        $ua   = strtolower((string) $request->userAgent());
 
-        if (is_string($hosts)) {
-            $decoded = json_decode($hosts, true);
-            $hosts = is_array($decoded) ? $decoded : explode(',', $hosts);
+        /*
+        |--------------------------------------------------------------------------
+        | 🔥 Normalize helper (json / comma / array safe)
+        |--------------------------------------------------------------------------
+        */
+        $normalize = function ($value): array {
+            if (is_string($value)) {
+                $decoded = json_decode($value, true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    return array_filter(array_map('trim', $decoded));
+                }
+                return array_filter(array_map('trim', explode(',', $value)));
+            }
+
+            if (is_array($value)) {
+                return array_filter(array_map('trim', $value));
+            }
+
+            return [];
+        };
+
+        /*
+        |--------------------------------------------------------------------------
+        | 🔥 IP EXCLUSION (supports exact, CIDR, range)
+        |--------------------------------------------------------------------------
+        */
+        foreach ($normalize($cfg['ips'] ?? []) as $excludedIp) {
+
+            // Exact match
+            if ($ip === $excludedIp) {
+                return true;
+            }
+
+            // CIDR (e.g. 192.168.1.0/24)
+            if (str_contains($excludedIp, '/')) {
+                if ($this->ipInCidr($ip, $excludedIp)) {
+                    return true;
+                }
+            }
+
+            // Range (e.g. 192.168.1.1-192.168.1.50)
+            if (str_contains($excludedIp, '-')) {
+                [$start, $end] = array_map('trim', explode('-', $excludedIp));
+                if ($this->ipInRange($ip, $start, $end)) {
+                    return true;
+                }
+            }
         }
 
-        foreach ($hosts as $h) {
-            if ($host === strtolower($h)) {
+        /*
+        |--------------------------------------------------------------------------
+        | 🔥 HOST EXCLUSION (supports wildcard)
+        |--------------------------------------------------------------------------
+        */
+        foreach ($normalize($cfg['hosts'] ?? []) as $h) {
+
+            $h = strtolower($h);
+
+            if ($host === $h) {
+                return true;
+            }
+
+            // wildcard: *.example.com
+            if (str_starts_with($h, '*.') && str_ends_with($host, substr($h, 1))) {
+                return true;
+            }
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | 🔥 PATH EXCLUSION (prefix match)
+        |--------------------------------------------------------------------------
+        */
+        foreach ($normalize($cfg['paths'] ?? []) as $p) {
+
+            $p = trim($p, '/');
+
+            if ($p !== '' && str_starts_with($path, $p)) {
+                return true;
+            }
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | 🔥 USER AGENT EXCLUSION (contains match)
+        |--------------------------------------------------------------------------
+        */
+        foreach ($normalize($cfg['user_agents'] ?? []) as $agent) {
+
+            if ($agent !== '' && str_contains($ua, strtolower($agent))) {
                 return true;
             }
         }
@@ -425,5 +510,35 @@ class TrackTraffic
                 'error' => $e->getMessage()
             ]);
         }
+    }
+
+    private function ipInCidr(string $ip, string $cidr): bool
+    {
+        [$subnet, $mask] = explode('/', $cidr);
+
+        $ipLong     = ip2long($ip);
+        $subnetLong = ip2long($subnet);
+
+        if ($ipLong === false || $subnetLong === false) {
+            return false;
+        }
+
+        $mask = -1 << (32 - (int)$mask);
+        $subnetLong &= $mask;
+
+        return ($ipLong & $mask) === $subnetLong;
+    }
+
+    private function ipInRange(string $ip, string $start, string $end): bool
+    {
+        $ipLong    = ip2long($ip);
+        $startLong = ip2long($start);
+        $endLong   = ip2long($end);
+
+        if ($ipLong === false || $startLong === false || $endLong === false) {
+            return false;
+        }
+
+        return $ipLong >= $startLong && $ipLong <= $endLong;
     }
 }
