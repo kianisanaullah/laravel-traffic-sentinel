@@ -124,7 +124,10 @@
                                     <textarea name="{{ $inputName }}"
                                               class="form-control font-monospace {{ $hasFieldError ? 'is-invalid' : '' }}"
                                               rows="4">{{ is_array($value) ? json_encode($value, JSON_PRETTY_PRINT) : $value }}</textarea>
-
+                                    <small class="text-muted">
+                                        Enter valid JSON array. Example:
+                                        <code>["1", "2"]</code>
+                                    </small>
                                     {{-- TEXT --}}
                                 @else
                                     <input type="text"

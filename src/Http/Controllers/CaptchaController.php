@@ -108,42 +108,51 @@ class CaptchaController extends Controller
     }
     private function sendCaptchaBlockAlert(string $ip)
     {
-        $emails = collect(explode(',', (string)config('traffic-sentinel.alerts.email')))
-            ->map(fn($e) => trim($e))
-            ->filter()
-            ->values()
-            ->all();
-
-        if (empty($emails)) {
-            return;
-        }
-
         try {
 
-            Mail::send(
-                'traffic-sentinel::emails.captcha-blocked',
-                [
-                    'ip' => $ip,
-                    'host' => request()->getHost(),
-                    'userAgent' => request()->userAgent(),
-                    'reason' => 'Repeated CAPTCHA failures',
-                    'status' => 'BLOCKED',
-                    'time' => now(),
-                ],
-                function ($msg) use ($emails, $ip) {
+            $emails = config('traffic-sentinel.alerts.email', []);
 
-                    $msg->to($emails)
-                        ->subject('🚫 Traffic Sentinel — IP Blocked after CAPTCHA Failures: ' . $ip);
+            /*
+            |--------------------------------------------------------------------------
+            | 🔥 Normalize Emails (JSON + comma + string safe)
+            |--------------------------------------------------------------------------
+            */
+            if (is_string($emails)) {
 
+                $decoded = json_decode($emails, true);
+
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    $emails = $decoded;
+                } else {
+                    $emails = array_map('trim', explode(',', $emails));
                 }
-            );
+            }
+
+            $emails = collect($emails)
+                ->filter()
+                ->values()
+                ->all();
+
+            if (empty($emails)) {
+                return;
+            }
+
+            \Mail::to($emails)
+                ->send(new \Kianisanaullah\TrafficSentinel\Mail\CaptchaBlockedMail([
+                    'ip'        => $ip,
+                    'host'      => request()->getHost(),
+                    'userAgent' => request()->userAgent(),
+                    'reason'    => 'Repeated CAPTCHA failures',
+                    'status'    => 'BLOCKED',
+                    'time'      => now(),
+                ]));
 
         } catch (\Throwable $e) {
 
-            \Log::error('TrafficSentinel captcha block email failed', [
+            \Log::channel('traffic_sentinel')->error('Captcha block email failed', [
+                'ip'    => $ip,
                 'error' => $e->getMessage()
             ]);
-
         }
     }
 }

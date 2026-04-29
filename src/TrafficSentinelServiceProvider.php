@@ -150,13 +150,23 @@ class TrafficSentinelServiceProvider extends ServiceProvider
                 );
 
                 foreach ($settings as $setting) {
-
                     $value = $setting->value;
-
-                    // prevent null override
-                    if ($value !== null) {
-                        config([$setting->key => $value]);
+                    if ($value === null) continue;
+                    if ($value === '1' || $value === 1) {
+                        $value = true;
+                    } elseif ($value === '0' || $value === 0) {
+                        $value = false;
                     }
+                    elseif (is_string($value)) {
+                        $decoded = json_decode($value, true);
+                        if (json_last_error() === JSON_ERROR_NONE) {
+                            $value = $decoded;
+                        }
+                    }
+                    if (is_numeric($value)) {
+                        $value = $value + 0;
+                    }
+                    config([$setting->key => $value]);
                 }
             }
         } catch (\Throwable $e) {

@@ -185,6 +185,32 @@ class TrackTraffic
     {
         $hits = $this->cache->increment($key, ceil($ttlSeconds / 60));
 
+        /*
+        |--------------------------------------------------------------------------
+        | 🔥 ALERT LOGIC (ADD THIS)
+        |--------------------------------------------------------------------------
+        */
+        if (config('traffic-sentinel.alerts.enabled')) {
+
+            $threshold = (int) config('traffic-sentinel.alerts.threshold', 100);
+
+            // trigger only once (prevent spam)
+            if ($hits == $threshold) {
+
+                $this->sendAlertSafely(request()->ip(), [
+                    'hits' => $hits,
+                    'key'  => $key,
+                    'time' => now(),
+                    'host' => request()->getHost(),
+                ]);
+            }
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | 🔥 BLOCK
+        |--------------------------------------------------------------------------
+        */
         if ($hits > $limit) {
             abort(429, $message);
         }
@@ -368,13 +394,36 @@ class TrackTraffic
     private function sendAlertSafely($ip, $data = [])
     {
         try {
-            \Log::warning('Traffic Sentinel Alert', [
-                'ip' => $ip,
-                'data' => $data
-            ]);
+
+            $emails = config('traffic-sentinel.alerts.email', []);
+
+            // 🔥 Normalize emails
+            if (is_string($emails)) {
+
+                // try JSON decode first
+                $decoded = json_decode($emails, true);
+
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    $emails = $decoded;
+                } else {
+                    // fallback: comma separated
+                    $emails = array_map('trim', explode(',', $emails));
+                }
+            }
+
+            if (empty($emails)) {
+                return; // no recipients
+            }
+            \Mail::to($emails)
+                ->send(new \App\Mail\TrafficAlertMail($ip, $data));
 
         } catch (\Throwable $e) {
-            \Log::error('TS Alert Failed: ' . $e->getMessage());
+
+            \Log::channel('traffic_sentinel')->error('Alert failed', [
+                'ip'    => $ip,
+                'data'  => $data,
+                'error' => $e->getMessage()
+            ]);
         }
     }
 }
