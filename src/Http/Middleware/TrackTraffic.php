@@ -172,10 +172,9 @@ class TrackTraffic
 
         $this->cache->put($cooldownKey, true, 10);
 
-        $this->sendAlertSafely([
+        $this->sendAlertSafely($ipStored, [
             'key' => $monitorKey,
             'hits' => $hits,
-            'ip' => $ipStored,
             'bot_name' => $botName,
             'host' => $host,
         ]);
@@ -263,44 +262,11 @@ class TrackTraffic
         try {
 
             $logKey = 'ts_block_log:' . $ipStored;
-            $trafficType = !empty($data['bot_name']) ? 'Bot' : 'Human';
-            $emails = config('traffic-sentinel.alerts.email', []);
 
-            // 🔥 Normalize emails
-            if (is_string($emails)) {
-
-                // try JSON decode first
-                $decoded = json_decode($emails, true);
-
-                if (json_last_error() === JSON_ERROR_NONE) {
-                    $emails = $decoded;
-                } else {
-                    // fallback: comma separated
-                    $emails = array_map('trim', explode(',', $emails));
-                }
+            // prevent spam logging
+            if ($this->cache->has($logKey)) {
+                return;
             }
-
-            if (empty($emails)) {
-                return; // no recipients
-            }
-
-            Mail::send(
-                'traffic-sentinel::emails.high-traffic-alert',
-                [
-                    'ip' => $data['ip'] ?? null,
-                    'hits' => $data['hits'] ?? 0,
-                    'trafficType' => $trafficType,
-                    'botName' => $data['bot_name'] ?? null,
-                    'host' => $data['host'] ?? null,
-                    'time' => now(),
-                ],
-                function ($msg) use ($emails, $data) {
-                    $msg->to($emails)
-                        ->subject('Traffic Sentinel Alert — High Traffic from IP ' . ($data['ip'] ?? 'unknown'));
-                }
-            );
-
-            if ($this->cache->has($logKey)) return;
 
             $this->cache->put($logKey, true, 1);
 
@@ -321,12 +287,11 @@ class TrackTraffic
             ]);
 
         } catch (\Throwable $e) {
-            \Log::error('TrafficSentinel blocked logging failed', [
+            \Log::channel('traffic_sentinel')->error('Blocked log failed', [
                 'error' => $e->getMessage(),
             ]);
         }
     }
-
     private function captchaRequiredKey(string $ipStored): string
     {
         return 'ts_captcha_required:' . $ipStored;
@@ -512,29 +477,27 @@ class TrackTraffic
         $path = ltrim((string)$request->path(), '/');
         return str_starts_with($path, 'livewire/');
     }
-    private function sendAlertSafely($ip, $data = [])
+    private function sendAlertSafely(string $ip, array $data = [])
     {
         try {
 
             $emails = config('traffic-sentinel.alerts.email', []);
 
-            // 🔥 Normalize emails
+            // normalize emails
             if (is_string($emails)) {
-
-                // try JSON decode first
                 $decoded = json_decode($emails, true);
 
                 if (json_last_error() === JSON_ERROR_NONE) {
                     $emails = $decoded;
                 } else {
-                    // fallback: comma separated
                     $emails = array_map('trim', explode(',', $emails));
                 }
             }
 
             if (empty($emails)) {
-                return; // no recipients
+                return;
             }
+
             $trafficType = !empty($data['bot_name']) ? 'Bot' : 'Human';
 
             Mail::send(
@@ -547,9 +510,9 @@ class TrackTraffic
                     'host' => $data['host'] ?? null,
                     'time' => now(),
                 ],
-                function ($msg) use ($emails, $data) {
+                function ($msg) use ($emails, $ip) {
                     $msg->to($emails)
-                        ->subject('Traffic Sentinel Alert — High Traffic from IP ' . ($data['ip'] ?? 'unknown'));
+                        ->subject('Traffic Sentinel Alert — High Traffic from IP ' . $ip);
                 }
             );
 
@@ -591,5 +554,25 @@ class TrackTraffic
         }
 
         return $ipLong >= $startLong && $ipLong <= $endLong;
+    }
+
+    private function enforceThrottle($ip, $bot, $host, $app, $rule)
+
+    {
+
+        $key = "ts_rate_ip:{$ip}";
+
+        $this->checkThrottleWindow(
+
+            $key,
+
+            $rule->limit ?? 100,
+
+            $rule->window_seconds ?? 60,
+
+            'Too many requests'
+
+        );
+
     }
 }
